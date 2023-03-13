@@ -10,6 +10,7 @@ Known Issues/Wishlist:
 
 from pyomo.environ import *
 from pyomo.opt import SolverStatus, TerminationCondition
+from pyomo.common.timing import TicTocTimer
 import numpy as np
 import pandas as pd
 import pypower.api as pp
@@ -18,7 +19,7 @@ from pypower.idx_bus import *
 from pypower.idx_gen import *
 from pypower.idx_brch import *
 from pypower.idx_cost import *
-from . import utils
+from . import utlis as utils
 
 class NYGrid:
     """
@@ -30,9 +31,9 @@ class NYGrid:
 
 
     """
-    def __init__(self, ppc, start_datetime, end_datetime, 
-                 setup_yaml='dirpaths.yml', verbose=False):
-        self.ppc = ppc
+    def __init__(self, ppc_filename, start_datetime, end_datetime, 
+                 verbose=False):
+        self.ppc = pp.loadcase(ppc_filename)
         self.start_datetime = start_datetime
         self.end_datetime = end_datetime
         self.verbose = verbose
@@ -132,7 +133,8 @@ class NYGrid:
         Returns:
             model (pyomo.core.base.PyomoModel.ConcreteModel): Pyomo model for multi-period OPF problem.
         '''
-
+        timer = TicTocTimer()
+        timer.tic('Starting timer...')
         model = ConcreteModel(name='multi-period OPF')
 
         # Define variables
@@ -173,7 +175,7 @@ class NYGrid:
             # DC Power flow constraint
             for b in range(self.NB):
                 model.c_pf.add(sum(self.gen_map[b, g]*model.PG[t, g] for g in range(self.NG)) 
-                               - sum(self.load_map[b, l]*self.load_pu[t, l] for l in range(NL))
+                               - sum(self.load_map[b, l]*self.load_pu[t, l] for l in range(self.NL))
                                 == sum(self.B[b, b_]*model.Va[t, b_] for b_ in range(self.NB)))
             
             # DC line power balance constraint
@@ -189,6 +191,10 @@ class NYGrid:
                                                       for i in range(len(br_idx))))
                 model.c_if_max.add(if_lims_max >= sum(br_dir[i]*model.PF[t, br_idx[i]] 
                                                       for i in range(len(br_idx))))
+
+            if self.verbose:
+                dT = timer.toc('Created constraints...')
+                print('Created constraints for time step {}, time elapsed {:.2f} seconds'.format(t, dT))
 
         for t in range(self.NT-1):
             # Ramp rate limit
@@ -373,7 +379,7 @@ class NYGrid:
 
         # Set gen parameters of the DC line converted generators
         num_dcline = dcline.shape[0]
-        dcline_gen = np.zeros((self.num_dcline*2, 21))
+        dcline_gen = np.zeros((num_dcline*2, 21))
         dcline_gen[:, GEN_BUS] = np.concatenate([dcline[:, DC_F_BUS], 
                                                     dcline[:, DC_T_BUS]])
         dcline_gen[:, PG] = np.concatenate([-dcline[:, DC_PF],
@@ -526,7 +532,7 @@ class NYGrid:
         bus_lmp = np.zeros(self.NT*self.NB)
         for i in range(self.NT*self.NB):
             bus_lmp[i] = np.abs(model_multi_opf.dual[model_multi_opf.c_pf[i+1]])/self.baseMVA
-        results_lmp = bus_lmp.reshape(self.num_time, self.num_bus)
+        results_lmp = bus_lmp.reshape(self.NT, self.NB)
         results_lmp = pd.DataFrame(results_lmp, index=self.timestamp_list)
 
         results = {

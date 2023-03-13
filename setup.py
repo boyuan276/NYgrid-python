@@ -3,7 +3,7 @@ Build and install the project.
 """
 from setuptools import setup, find_packages
 
-NAME = "NYgrid-python"
+NAME = "nygrid"
 FULLNAME = "NYgrid Python Tools"
 AUTHOR = "The NYgrid-python Developers"
 AUTHOR_EMAIL = "by276@cornell.edu"

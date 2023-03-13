@@ -607,7 +607,6 @@ def opf_results_single(model_single, ppc_int):
 
     return results
 
-
 def opf_results_multi(model_multi, ppc_int, start_time, end_time):
     '''
     Get results for a multi-period OPF problem.

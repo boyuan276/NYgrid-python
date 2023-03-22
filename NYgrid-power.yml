@@ -14,5 +14,6 @@ dependencies:
   - pypsa
   - seaborn
   - python=3.8
+  - pip
   - pip:
     - pypower==5.1.15

@@ -1,3 +1,8 @@
+# User-specific stuff
+data/solar
+data/onshore_wind
+data/offshore_wind
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

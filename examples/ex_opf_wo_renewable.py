@@ -8,9 +8,7 @@ from pyomo.environ import *
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import pypower.api as pp
 from datetime import datetime, timedelta
-import nygrid.opf as opf
 from nygrid.run_nygrid import NYGrid
 
 # %% Set up directories

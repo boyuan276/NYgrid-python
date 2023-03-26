@@ -46,6 +46,7 @@ class NYGrid:
             print('Initializing NYGrid run...')
             print(f'NYGrid run starting on: {self.start_datetime}')
             print(f'NYGrid run ending on: {self.end_datetime}')
+            print(f'NYGrid run duration: {self.delt}')
 
         self.timestamp_list = pd.date_range(self.start_datetime, self.end_datetime, freq='1H')
         self.NT = len(self.timestamp_list)
@@ -143,8 +144,12 @@ class NYGrid:
         Returns:
             model (pyomo.core.base.PyomoModel.ConcreteModel): Pyomo model for multi-period OPF problem.
         '''
-        timer = TicTocTimer()
-        timer.tic('Starting timer ...')
+        print('Creating multi-period OPF problem ...')
+
+        if self.verbose:
+            timer = TicTocTimer()
+            timer.tic('Starting timer ...')
+
         model = ConcreteModel(name='multi-period OPF')
 
         # Define variables
@@ -202,14 +207,20 @@ class NYGrid:
                 model.c_if_max.add(if_lims_max >= sum(br_dir[i]*model.PF[t, br_idx[i]] 
                                                       for i in range(len(br_idx))))
 
+            if t == 0:
+                if self.gen_init is not None:
+                    # Ramp rate limit from initial condition
+                    for g in range(self.NG):
+                        model.c_gen_ramp_down.add(-model.PG[t, g] + self.gen_init[g] <= self.ramp_down[t, g])
+                        model.c_gen_ramp_up.add(model.PG[t, g] - self.gen_init[g] <= self.ramp_up[t, g])
+            else:
+                # Ramp rate limit
+                for g in range(self.NG):
+                    model.c_gen_ramp_down.add(-model.PG[t, g] + model.PG[t-1, g] <= self.ramp_down[t, g])
+                    model.c_gen_ramp_up.add(model.PG[t, g] - model.PG[t-1, g] <= self.ramp_up[t, g])
+            
             if self.verbose:
-                dT = timer.toc(f'Created constraints for time step {t} ...')
-
-        for t in range(self.NT-1):
-            # Ramp rate limit
-            for g in range(self.NG):
-                model.c_gen_ramp_down.add(-model.PG[t+1, g] + model.PG[t, g] <= self.ramp_down[t, g])
-                model.c_gen_ramp_up.add(model.PG[t+1, g] - model.PG[t, g] <= self.ramp_up[t, g])
+                timer.toc(f'Created constraints for time step {t} ...')
 
         def cost(model, gencost_0, gencost_1):
             cost = 0
@@ -219,6 +230,8 @@ class NYGrid:
             return cost
 
         model.obj = Objective(expr=cost(model, self.gencost_0, self.gencost_1), sense=minimize)
+
+        print('Created model ...')
 
         return model
 
@@ -308,6 +321,21 @@ class NYGrid:
         self.gencost0_profile = gencost0_profile[self.start_datetime:self.end_datetime].to_numpy()
         self.gencost1_profile = gencost1_profile[self.start_datetime:self.end_datetime].to_numpy()
 
+    def get_gen_init_data(self, gen_init):
+        '''
+        Get generator initial condition.
+
+        Parameters
+        ----------
+            gen_init (numpy.ndarray): A 1-d array of generator initial condition
+
+        '''
+
+        if gen_init is not None:
+            self.gen_init = gen_init/self.baseMVA
+        else:
+            self.gen_init = None
+
     def process_ppc(self):
         '''
         Process PyPower case to get constraint value for the OPF problem.
@@ -396,6 +424,15 @@ class NYGrid:
         self.if_map[:, 1] = br_dir*(br_idx-1)
 
         ##### User defined data
+        # Historical generation data
+        if self.gen_profile is not None:
+            self.gen_hist = np.empty((self.NT, self.NG))
+            self.gen_hist[:, self.gen_idx_non_dc] = self.gen_profile/self.baseMVA
+            self.gen_hist[:, self.dc_idx_f] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_f, PG]/self.baseMVA
+            self.gen_hist[:, self.dc_idx_t] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_t, PG]/self.baseMVA
+        else:
+            self.gen_hist = np.zeros((self.NT, self.NG))
+
         # Generator upper operating limit in p.u.
         if self.genmax_profile is not None:
             self.gen_max = np.empty((self.NT, self.NG))
@@ -532,9 +569,11 @@ class NYGrid:
                                                     dcline[:, DC_BR_STATUS]])
         dcline_gen[:, PMAX] = np.concatenate([dcline[:, DC_PMAX],
                                             dcline[:, DC_PMAX]])
-        # dcline_gen[:, PMAX] = np.full(num_dcline*2, np.inf)
         dcline_gen[:, PMIN] = np.concatenate([dcline[:, DC_PMIN],
                                             dcline[:, DC_PMIN]])
+        dcline_gen[:, RAMP_AGC] = np.ones(num_dcline*2)*1e10 # Unlimited ramp rate
+        dcline_gen[:, RAMP_10] = np.ones(num_dcline*2)*1e10 # Unlimited ramp rate
+        dcline_gen[:, RAMP_30] = np.ones(num_dcline*2)*1e10 # Unlimited ramp rate
         # Add the DC line converted generators to the gen matrix
         ppc_dc['gen'] = np.concatenate([gen, dcline_gen])
 
@@ -680,3 +719,41 @@ class NYGrid:
 
         return results
 
+    def show_model_dim(self, model_multi_opf):
+        '''
+        Show model dimensions.
+        '''
+        print('Number of buses: {}'.format(self.NB))
+        print('Number of generators: {}'.format(self.NG))
+        print('Number of branches: {}'.format(self.NBR))
+        print('Number of time periods: {}'.format(self.NT))
+
+        num_vars = len(model_multi_opf.PG) \
+                    + len(model_multi_opf.Va) \
+                    + len(model_multi_opf.PF)
+        print('Number of variables: {}'.format(num_vars))
+
+        num_constraints = len(model_multi_opf.c_br_flow) \
+                    + len(model_multi_opf.c_br_max) \
+                    + len(model_multi_opf.c_br_min) \
+                    + len(model_multi_opf.c_gen_max) \
+                    + len(model_multi_opf.c_gen_min) \
+                    + len(model_multi_opf.c_pf) \
+                    + len(model_multi_opf.c_gen_ramp_up) \
+                    + len(model_multi_opf.c_gen_ramp_down) \
+                    + len(model_multi_opf.c_dcline) \
+                    + len(model_multi_opf.c_if_max) \
+                    + len(model_multi_opf.c_if_min)
+        print('Number of constraints: {}'.format(num_constraints))
+
+    def get_last_gen(self, model_multi_opf):
+        '''
+        Get generator power generation at the last simulation.
+        Used to create initial condition for the next simulation.
+        '''
+        # Get dimensions of the last simulation
+        NT = len(model_multi_opf.PG_index_0)
+        NG = len(model_multi_opf.PG_index_1)
+        results_pg = np.array(model_multi_opf.PG[:,:]()).reshape(NT, NG)*self.baseMVA
+        last_gen = results_pg[-1, :]
+        return last_gen

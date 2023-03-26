@@ -48,6 +48,16 @@ class NYGrid:
             print(f'NYGrid run ending on: {self.end_datetime}')
 
         self.timestamp_list = pd.date_range(self.start_datetime, self.end_datetime, freq='1H')
+        self.NT = len(self.timestamp_list)
+
+        # User-defined parameters
+        self.load_profile = None
+        self.gen_profile = None
+        self.genmax_profile = None
+        self.genmin_profile = None
+        self.genramp_profile = None
+        self.gencost0_profile = None
+        self.gencost1_profile = None
 
     def create_single_opf(self):
         '''
@@ -134,7 +144,7 @@ class NYGrid:
             model (pyomo.core.base.PyomoModel.ConcreteModel): Pyomo model for multi-period OPF problem.
         '''
         timer = TicTocTimer()
-        timer.tic('Starting timer...')
+        timer.tic('Starting timer ...')
         model = ConcreteModel(name='multi-period OPF')
 
         # Define variables
@@ -169,8 +179,8 @@ class NYGrid:
 
             # Generation capacity limit
             for g in range(self.NG):
-                model.c_gen_max.add(model.PG[t, g] <= self.gen_max[g])
-                model.c_gen_min.add(model.PG[t, g] >= self.gen_min[g])
+                model.c_gen_max.add(model.PG[t, g] <= self.gen_max[t, g])
+                model.c_gen_min.add(model.PG[t, g] >= self.gen_min[t, g])
 
             # DC Power flow constraint
             for b in range(self.NB):
@@ -193,29 +203,110 @@ class NYGrid:
                                                       for i in range(len(br_idx))))
 
             if self.verbose:
-                dT = timer.toc('Created constraints...')
-                print('Created constraints for time step {}, time elapsed {:.2f} seconds'.format(t, dT))
+                dT = timer.toc(f'Created constraints for time step {t} ...')
 
         for t in range(self.NT-1):
             # Ramp rate limit
             for g in range(self.NG):
-                model.c_gen_ramp_down.add(-model.PG[t+1, g] + model.PG[t, g] <= self.ramp_down[g])
-                model.c_gen_ramp_up.add(model.PG[t+1, g] - model.PG[t, g] <= self.ramp_up[g])
+                model.c_gen_ramp_down.add(-model.PG[t+1, g] + model.PG[t, g] <= self.ramp_down[t, g])
+                model.c_gen_ramp_up.add(model.PG[t+1, g] - model.PG[t, g] <= self.ramp_up[t, g])
 
         def cost(model, gencost_0, gencost_1):
             cost = 0
             for t in range(self.NT):
-                cost += sum(gencost_0[g] for g in range(self.NG)) \
-                    + sum(gencost_1[g]*model.PG[t, g] for g in range(self.NG))
+                cost += sum(gencost_0[t, g] for g in range(self.NG)) \
+                    + sum(gencost_1[t, g]*model.PG[t, g] for g in range(self.NG))
             return cost
 
         model.obj = Objective(expr=cost(model, self.gencost_0, self.gencost_1), sense=minimize)
 
         return model
 
-    def get_load_data(self, load):
-        self.load = load
-        self.NT = self.load.shape[0]
+    def get_load_data(self, load_profile):
+        '''
+        Get load data from load profile.
+
+        Parameters
+        ----------
+            load_profile (str): Path to load profile csv file.
+            
+        Returns
+        -------
+            load (numpy.ndarray): A 2-d array of load at each timestamp at each bus
+        '''
+        self.load_profile = load_profile[self.start_datetime:self.end_datetime].to_numpy()
+
+    def get_gen_data(self, gen_profile):
+        '''
+        Get generation data from generation profile.
+
+        Parameters
+        ----------
+            gen_profile (str): Path to generation profile csv file.
+            
+        Returns
+        -------
+            gen (numpy.ndarray): A 2-d array of generation at each timestamp at each bus
+        '''
+        self.gen_profile = gen_profile[self.start_datetime:self.end_datetime].to_numpy()
+
+    def get_genmax_data(self, genmax_profile):
+        '''
+        Get generation capacity data from generation capacity profile.
+
+        Parameters
+        ----------
+            genmax_profile (str): Path to generation capacity profile csv file.
+            
+        Returns
+        -------
+            gen_max (numpy.ndarray): A 2-d array of generation capacity at each bus
+        '''
+        self.genmax_profile = genmax_profile[self.start_datetime:self.end_datetime].to_numpy()
+
+    def get_genmin_data(self, genmin_profile):
+        '''
+        Get generation capacity data from generation capacity profile.
+
+        Parameters
+        ----------
+            genmin_profile (str): Path to generation capacity profile csv file.
+            
+        Returns
+        -------
+            gen_min (numpy.ndarray): A 2-d array of generation capacity at each bus
+        '''
+        self.genmin_profile = genmin_profile[self.start_datetime:self.end_datetime].to_numpy()
+
+    def get_genramp_data(self, ramp_profile, interval='30min'):
+        '''
+        Get ramp rate data from ramp rate profile.
+
+        Parameters
+        ----------
+            ramp_profile (str): Path to ramp rate profile csv file.
+            
+        Returns
+        -------
+            ramp_up (numpy.ndarray): A 2-d array of ramp rate at each bus
+            ramp_down (numpy.ndarray): A 2-d array of ramp rate at each bus
+        '''
+        # Convert 30min ramp rate to hourly ramp rate
+        if interval == '30min':
+            ramp_profile = ramp_profile*2
+        self.genramp_profile = ramp_profile[self.start_datetime:self.end_datetime].to_numpy()
+
+    def get_gencost_data(self, gencost0_profile, gencost1_profile):
+        '''
+        Get generation cost data from generation cost profile.
+
+        Parameters
+        ----------
+            gencost0_profile (pandas.DataFrame): A 2-d array of generation cost at each bus
+            gencost1_profile (pandas.DataFrame): A 2-d array of generation cost at each bus
+        '''
+        self.gencost0_profile = gencost0_profile[self.start_datetime:self.end_datetime].to_numpy()
+        self.gencost1_profile = gencost1_profile[self.start_datetime:self.end_datetime].to_numpy()
 
     def process_ppc(self):
         '''
@@ -230,7 +321,7 @@ class NYGrid:
         -------
             Parameters of the network and constraints.
         '''
-
+        ##### Constant data
         # Remove user functions
         del self.ppc['userfcn']
 
@@ -253,6 +344,7 @@ class NYGrid:
 
         # Convert to internal indexing
         self.ppc_int = pp.ext2int(self.ppc_dc)
+        # self.ppc_int = self.ppc_dc
 
         self.baseMVA = self.ppc_int['baseMVA']
         self.bus = self.ppc_int['bus']
@@ -279,9 +371,10 @@ class NYGrid:
         self.gen_map[self.gen_bus, range(self.NG)] = 1
 
         # Get index of DC line converted generators in internal indexing
-        gen_i2e = self.ppc_int['order']['gen']['i2e']
-        self.dc_idx_f = gen_i2e[self.NG-self.num_dcline*2: self.NG-self.num_dcline]
-        self.dc_idx_t = gen_i2e[self.NG-self.num_dcline: self.NG]
+        self.gen_i2e = self.ppc_int['order']['gen']['i2e']
+        self.dc_idx_f = self.gen_i2e[self.NG-self.num_dcline*2: self.NG-self.num_dcline]
+        self.dc_idx_t = self.gen_i2e[self.NG-self.num_dcline: self.NG]
+        self.gen_idx_non_dc = self.gen_i2e[:self.NG-self.num_dcline*2]
 
         # Get mapping from load to bus
         self.load_map = np.zeros((self.NB, self.NL))
@@ -289,23 +382,11 @@ class NYGrid:
         for i in range(len(self.load_bus)):
             self.load_map[self.load_bus[i], i] = 1
 
-        # Generator capacity limit in p.u.
-        self.gen_max = self.gen[:, PMAX]/self.baseMVA
-        self.gen_min = self.gen[:, PMIN]/self.baseMVA
-
-        # Generator upward and downward ramp limit in p.u.
-        self.ramp_up = self.gen[:, RAMP_30]*2/self.baseMVA
-        self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
-
         # Line flow limit in p.u.
         self.br_max = self.branch[:, RATE_A]/self.baseMVA
         # Replace default value 0 to 999
         self.br_max[self.br_max == 0] = 999.99
         self.br_min = - self.br_max
-
-        # Linear cost coefficients in p.u.
-        self.gencost_1 = self.gencost[:, COST]*self.baseMVA
-        self.gencost_0 = self.gencost[:, COST+1]
 
         # Get interface limit information
         self.if_map = self.ppc_int['if']['map']
@@ -313,9 +394,63 @@ class NYGrid:
         self.if_lims[:,1:] = self.if_lims[:,1:]/self.baseMVA
         br_dir, br_idx = np.sign(self.if_map[:,1]), np.abs(self.if_map[:,1]).astype(int)
         self.if_map[:, 1] = br_dir*(br_idx-1)
-        
+
+        ##### User defined data
+        # Generator upper operating limit in p.u.
+        if self.genmax_profile is not None:
+            self.gen_max = np.empty((self.NT, self.NG))
+            self.gen_max[:, self.gen_idx_non_dc] = self.genmax_profile/self.baseMVA
+            self.gen_max[:, self.dc_idx_f] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_f, PMAX]/self.baseMVA
+            self.gen_max[:, self.dc_idx_t] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_t, PMAX]/self.baseMVA
+        else:
+            self.gen_max = np.ones((self.NT, self.NG))*self.gen[:, PMAX]/self.baseMVA
+
+         # Generator lower operating limit in p.u.
+        if self.genmin_profile is not None:
+            self.gen_min = np.empty((self.NT, self.NG))
+            self.gen_min[:, self.gen_idx_non_dc] = self.genmin_profile/self.baseMVA
+            self.gen_min[:, self.dc_idx_f] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_f, PMIN]/self.baseMVA
+            self.gen_min[:, self.dc_idx_t] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_t, PMIN]/self.baseMVA
+        else:
+            self.gen_min = np.ones((self.NT, self.NG))*self.gen[:, PMIN]/self.baseMVA
+
+        # Generator ramp rate limit in p.u.
+        if self.genramp_profile is not None:         
+            self.ramp_up = np.empty((self.NT, self.NG))
+            self.ramp_up[:, self.gen_idx_non_dc] = self.genramp_profile/self.baseMVA
+            self.ramp_up[:, self.dc_idx_f] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_f, RAMP_30]*2/self.baseMVA
+            self.ramp_up[:, self.dc_idx_t] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_t, RAMP_30]*2/self.baseMVA
+
+            self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
+        else:
+            self.ramp_up = np.ones((self.NT, self.NG))*self.gen[:, RAMP_30]*2/self.baseMVA
+            self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
+
+        # Linear cost intercept coefficients in p.u.
+        if self.gencost0_profile is not None:           
+            self.gencost_0 = np.empty((self.NT, self.NG))
+            self.gencost_0[:, self.gen_idx_non_dc] = self.gencost0_profile
+            self.gencost_0[:, self.dc_idx_f] = np.ones((self.NT, self.num_dcline))*self.gencost[self.dc_idx_f, COST+1]
+            self.gencost_0[:, self.dc_idx_t] = np.ones((self.NT, self.num_dcline))*self.gencost[self.dc_idx_t, COST+1]
+
+        else:
+            self.gencost_0 = np.ones((self.NT, self.NG))*self.gencost[:, COST+1]
+
+        # Linear cost slope coefficients in p.u.
+        if self.gencost1_profile is not None:           
+            self.gencost_1 = np.empty((self.NT, self.NG))
+            self.gencost_1[:, self.gen_idx_non_dc] = self.gencost1_profile*self.baseMVA
+            self.gencost_1[:, self.dc_idx_f] = np.ones((self.NT, self.num_dcline))*self.gencost[self.dc_idx_f, COST]*self.baseMVA
+            self.gencost_1[:, self.dc_idx_t] = np.ones((self.NT, self.num_dcline))*self.gencost[self.dc_idx_t, COST]*self.baseMVA
+        else:
+            self.gencost_1 = np.ones((self.NT, self.NG))*self.gencost[:, COST]*self.baseMVA
+            
         # Convert load to p.u.
-        self.load_pu = self.load/self.baseMVA
+        if self.load_profile is not None:
+            self.load_pu = self.load_profile/self.baseMVA
+        else:
+            self.load_pu = np.ones((self.NT, self.NL))*self.bus[:, PD]/self.baseMVA
+            Warning("No load profile is provided. Using default load profile.")
 
     def check_status(self, results):
         '''
@@ -395,9 +530,9 @@ class NYGrid:
         dcline_gen[:, MBASE] = np.ones(num_dcline*2)*baseMVA
         dcline_gen[:, GEN_STATUS] = np.concatenate([dcline[:, DC_BR_STATUS],
                                                     dcline[:, DC_BR_STATUS]])
-        # dcline_gen[:, PMAX] = np.concatenate([dcline[:, DC_PMAX],
-        #                                     dcline[:, DC_PMAX]])
-        dcline_gen[:, PMAX] = np.full(num_dcline*2, np.inf)
+        dcline_gen[:, PMAX] = np.concatenate([dcline[:, DC_PMAX],
+                                            dcline[:, DC_PMAX]])
+        # dcline_gen[:, PMAX] = np.full(num_dcline*2, np.inf)
         dcline_gen[:, PMIN] = np.concatenate([dcline[:, DC_PMIN],
                                             dcline[:, DC_PMIN]])
         # Add the DC line converted generators to the gen matrix

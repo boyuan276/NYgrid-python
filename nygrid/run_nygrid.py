@@ -505,11 +505,11 @@ class NYGrid:
             print("The problem is feasible and optimal!")
         elif results.solver.termination_condition == TerminationCondition.infeasible:
             status = False
-            print("The problem is infeasible!")
+            raise RuntimeError("The problem is infeasible!")
         else:
             status = False
-            print("Something else is wrong!")
             print (str(results.solver))
+            raise RuntimeError("Something else is wrong!")
         return status
     
     def convert_dcline_2_gen(self):

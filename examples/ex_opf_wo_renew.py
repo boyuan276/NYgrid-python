@@ -1,5 +1,6 @@
 """
 Run multi-period OPF with 2018 data
+without renewable generators
 
 """
 # %% Packages
@@ -10,6 +11,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from nygrid.run_nygrid import NYGrid
+import pickle
+import time
+
+t = time.time()
 
 # %% Set up directories
 cwd = os.getcwd()
@@ -33,7 +38,7 @@ print('Results directory: {}'.format(results_dir))
 
 # %% Read grid data
 start_date = datetime(2018, 1, 1, 0, 0, 0)
-end_date = datetime(2018, 1, 3, 0, 0, 0)
+end_date = datetime(2019, 1, 1, 0, 0, 0)
 
 # Read load profile
 load_profile = pd.read_csv(os.path.join(grid_data_dir, f'load_profile_{start_date.year}.csv'), 
@@ -74,12 +79,9 @@ timestamp_list = pd.date_range(start_date, end_date, freq='1D')
 
 # Loop through all days
 for d in range(len(timestamp_list)-1):
-
+    # Run one day at a time
     start_datetime = timestamp_list[d]
     end_datetime = timestamp_list[d+1]
-    print(f'Start time: {start_datetime}')
-    print(f'End time: {end_datetime}')
-    load = load_profile.loc[start_datetime:end_datetime].to_numpy()
 
     # Read MATPOWER case file
     ppc_filename = os.path.join(data_dir, 'ny_grid.mat')
@@ -138,7 +140,15 @@ for d in range(len(timestamp_list)-1):
     thermal_pg.index.name = 'TimeStamp'
 
     # Save thermal generation to CSV
-    filename = f'thermal_{start_datetime.strftime("%Y%m%d")}_{end_datetime.strftime("%Y%m%d")}.csv'
-    thermal_pg.to_csv(os.path.join(results_dir,filename))
+    filename = f'thermal_wo_renew_{start_datetime.strftime("%Y%m%d")}_{end_datetime.strftime("%Y%m%d")}.csv'
+    thermal_pg.to_csv(os.path.join(results_dir, 'wo_renew', filename))
     print(f'Saved thermal generation results in {filename}')
+
+    # Save simulation results to pickle
+    filename = f'nygrid_sim_wo_renew_{start_datetime.strftime("%Y%m%d")}_{end_datetime.strftime("%Y%m%d")}.pkl'
+    with open(os.path.join(results_dir, 'wo_renew', filename), 'wb') as f:
+        pickle.dump([nygrid_sim, model_multi_opf, results], f)
+    print(f'Saved simulation results in {filename}')
+    elapsed = time.time() - t
+    print(f'Elapsed time: {elapsed:.2f} seconds')
     print('-----------------------------------------------------------------')

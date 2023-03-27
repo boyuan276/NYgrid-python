@@ -2,6 +2,7 @@
 data/solar
 data/onshore_wind
 data/offshore_wind
+data/buildings
 figures/
 results/
 

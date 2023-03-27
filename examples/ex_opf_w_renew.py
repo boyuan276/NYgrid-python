@@ -166,6 +166,7 @@ ext_load_profile = load_profile_copy[ext_buses]
 ny_renewable_pct = total_renewable[ny_buses].sum().sum() / ny_load_profile.sum().sum()
 ext_renewable = ext_load_profile * ny_renewable_pct
 load_profile_renewable = load_profile_renewable.subtract(ext_renewable, fill_value=0)
+load_profile_renewable.index = load_profile.index
 
 # %% Set up OPF model
 timestamp_list = pd.date_range(start_date, end_date, freq='1D')
@@ -185,7 +186,7 @@ for d in range(len(timestamp_list)-1):
                         verbose=True)
 
     # Read grid data
-    nygrid_sim.get_load_data(load_profile)
+    nygrid_sim.get_load_data(load_profile_renewable)
     nygrid_sim.get_gen_data(gen_profile)
     nygrid_sim.get_genmax_data(genmax_profile)
     nygrid_sim.get_genmin_data(genmin_profile)

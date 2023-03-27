@@ -81,15 +81,15 @@ timestamp_list = pd.date_range(start_date, end_date, freq='1D')
 for d in range(len(timestamp_list)-1):
     # Run one day at a time
     start_datetime = timestamp_list[d]
-    end_datetime = timestamp_list[d+1]
+    end_datetime = start_datetime + timedelta(hours=23)
 
     # Read MATPOWER case file
     ppc_filename = os.path.join(data_dir, 'ny_grid.mat')
 
     nygrid_sim = NYGrid(ppc_filename, 
-                        start_datetime=start_datetime.strftime('%Y-%m-%d'), 
-                        end_datetime=end_datetime.strftime('%Y-%m-%d'), 
-                        verbose=False)
+                        start_datetime=start_datetime.strftime('%m-%d-%Y %H'), 
+                        end_datetime=end_datetime.strftime('%m-%d-%Y %H'), 
+                        verbose=True)
 
     # Read grid data
     nygrid_sim.get_load_data(load_profile)
@@ -140,12 +140,12 @@ for d in range(len(timestamp_list)-1):
     thermal_pg.index.name = 'TimeStamp'
 
     # Save thermal generation to CSV
-    filename = f'thermal_wo_renew_{start_datetime.strftime("%Y%m%d")}_{end_datetime.strftime("%Y%m%d")}.csv'
+    filename = f'thermal_wo_renew_{start_datetime.strftime("%Y%m%d%H")}_{end_datetime.strftime("%Y%m%d%H")}.csv'
     thermal_pg.to_csv(os.path.join(results_dir, 'wo_renew', filename))
     print(f'Saved thermal generation results in {filename}')
 
     # Save simulation results to pickle
-    filename = f'nygrid_sim_wo_renew_{start_datetime.strftime("%Y%m%d")}_{end_datetime.strftime("%Y%m%d")}.pkl'
+    filename = f'nygrid_sim_wo_renew_{start_datetime.strftime("%Y%m%d%H")}_{end_datetime.strftime("%Y%m%d%H")}.pkl'
     with open(os.path.join(results_dir, 'wo_renew', filename), 'wb') as f:
         pickle.dump([nygrid_sim, model_multi_opf, results], f)
     print(f'Saved simulation results in {filename}')

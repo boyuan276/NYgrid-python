@@ -165,9 +165,18 @@ ny_buses = np.arange(37, 83)
 ext_buses = np.array(list(set(load_profile_copy.columns) - set(ny_buses)))
 ny_load_profile = load_profile_copy[ny_buses]
 ext_load_profile = load_profile_copy[ext_buses]
-ny_renewable_pct = total_renewable[ny_buses].sum().sum() / ny_load_profile.sum().sum()
-ext_renewable = ext_load_profile * ny_renewable_pct
-load_profile_renewable = load_profile_renewable.subtract(ext_renewable, fill_value=0)
+
+# NY load change rate in each hour
+ny_change_pct = ((load_profile_renewable[ny_buses].sum(axis=1)
+                  - ny_load_profile.sum(axis=1)) / ny_load_profile.sum(axis=1))
+print(f'NYS annual load change: {ny_change_pct.mean()*100:.2f}%')
+
+ext_change = ext_load_profile.multiply(ny_change_pct*0.2, axis=0)
+load_profile_renewable = load_profile_renewable.add(ext_change, fill_value=0)
+print(f'External load change is set to 20% of NYS load change.')
+
+# Reset timestamp index to time zone unaware
+load_profile_copy.index = load_profile.index
 load_profile_renewable.index = load_profile.index
 
 # %% Read thermal generator info table

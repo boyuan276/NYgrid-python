@@ -282,11 +282,21 @@ class NYGrid:
                        within=Reals, initialize=0)  # Branch power flow
         # Dual variables for price information
         model.dual = Suffix(direction=Suffix.IMPORT)
-        model.s_if_max = Var(range(self.NT), range(len(self.if_lims)),
-                             within=NonNegativeReals, initialize=1)  # Slack variable for interface flow upper bound
-        model.s_if_min = Var(range(self.NT), range(len(self.if_lims)),
-                             within=NonNegativeReals, initialize=1)  # Slack variable for interface flow lower bound
 
+        # Slack variables for soft constraints
+        # Slack variable for interface flow upper bound
+        model.s_if_max = Var(range(self.NT), range(len(self.if_lims)),
+                             within=NonNegativeReals, initialize=0)
+        # Slack variable for interface flow lower bound
+        model.s_if_min = Var(range(self.NT), range(len(self.if_lims)),
+                             within=NonNegativeReals, initialize=0)
+        # Slack variable for branch flow upper bound
+        model.s_br_max = Var(range(self.NT), range(self.NBR),
+                             within=NonNegativeReals, initialize=0)
+        # Slack variable for branch flow lower bound
+        model.s_br_min = Var(range(self.NT), range(self.NBR),
+                             within=NonNegativeReals, initialize=0)
+        
         # Define constraints
         model.c_br_flow = ConstraintList()
         model.c_br_max = ConstraintList()
@@ -305,8 +315,8 @@ class NYGrid:
             for br in range(self.NBR):
                 model.c_br_flow.add(model.PF[t, br] == sum(self.Bf[br, b]*model.Va[t, b]
                                                            for b in range(self.NB)))
-                model.c_br_max.add(model.PF[t, br] <= self.br_max[br])
-                model.c_br_min.add(model.PF[t, br] >= self.br_min[br])
+                model.c_br_max.add(model.PF[t, br] <= self.br_max[br] + model.s_br_max[t, br])
+                model.c_br_min.add(model.PF[t, br] >= self.br_min[br] - model.s_br_min[t, br])
 
             # Generation capacity limit
             for g in range(self.NG):
@@ -361,7 +371,9 @@ class NYGrid:
                 cost += sum(gencost_0[t, g] for g in range(self.NG)) \
                     + sum(gencost_1[t, g]*model.PG[t, g] for g in range(self.NG)) \
                     + sum(model.s_if_max[t, n] for n in range(len(self.if_lims)))*slack_cost_weight \
-                    + sum(model.s_if_min[t, n] for n in range(len(self.if_lims)))*slack_cost_weight
+                    + sum(model.s_if_min[t, n] for n in range(len(self.if_lims)))*slack_cost_weight \
+                    + sum(model.s_br_max[t, n] for n in range(self.NBR))*slack_cost_weight \
+                    + sum(model.s_br_min[t, n] for n in range(self.NBR))*slack_cost_weight
 
             return cost
 

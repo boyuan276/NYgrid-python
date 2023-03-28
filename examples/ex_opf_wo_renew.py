@@ -36,6 +36,9 @@ print('Figure directory: {}'.format(fig_dir))
 results_dir = os.path.join(os.path.dirname(data_dir), 'results')
 print('Results directory: {}'.format(results_dir))
 
+if not os.path.exists(os.path.join(results_dir, 'wo_renew')):
+    os.mkdir(os.path.join(results_dir, 'wo_renew'))
+
 # %% Read grid data
 start_date = datetime(2018, 1, 1, 0, 0, 0)
 end_date = datetime(2019, 1, 1, 0, 0, 0)

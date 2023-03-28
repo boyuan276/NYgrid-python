@@ -37,6 +37,9 @@ print('Figure directory: {}'.format(fig_dir))
 results_dir = os.path.join(os.path.dirname(data_dir), 'results')
 print('Results directory: {}'.format(results_dir))
 
+if not os.path.exists(os.path.join(results_dir, 'w_renew')):
+    os.mkdir(os.path.join(results_dir, 'w_renew'))
+
 solar_data_dir = os.path.join(data_dir, 'solar')
 print('Solar data directory: {}'.format(solar_data_dir))
 

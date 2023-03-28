@@ -34,11 +34,10 @@ class NYGrid:
     """
 
     def __init__(self, ppc_filename, start_datetime, end_datetime,
-                 slack_cost_weight=1e21, verbose=False):
+                 verbose=False):
         self.ppc = pp.loadcase(ppc_filename)
         self.start_datetime = start_datetime
         self.end_datetime = end_datetime
-        self.slack_cost_weight = slack_cost_weight
         self.verbose = verbose
 
         # Format the forecast start/end and determine the total time.
@@ -255,7 +254,7 @@ class NYGrid:
 
         return model
 
-    def create_multi_opf_soft(self):
+    def create_multi_opf_soft(self, slack_cost_weight=1e21):
         '''
         Multi-period OPF problem.
 
@@ -361,8 +360,8 @@ class NYGrid:
             for t in range(self.NT):
                 cost += sum(gencost_0[t, g] for g in range(self.NG)) \
                     + sum(gencost_1[t, g]*model.PG[t, g] for g in range(self.NG)) \
-                    + sum(model.s_if_max[t, n] for n in range(len(self.if_lims)))*self.slack_cost_weight \
-                    + sum(model.s_if_min[t, n] for n in range(len(self.if_lims)))*self.slack_cost_weight
+                    + sum(model.s_if_max[t, n] for n in range(len(self.if_lims)))*slack_cost_weight \
+                    + sum(model.s_if_min[t, n] for n in range(len(self.if_lims)))*slack_cost_weight
 
             return cost
 

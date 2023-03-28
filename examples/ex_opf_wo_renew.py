@@ -124,7 +124,7 @@ for d in range(len(timestamp_list)-1):
     # Initialize single period OPF
     model_multi_opf = nygrid_sim.create_multi_opf()
 
-    solver = SolverFactory('glpk')
+    solver = SolverFactory('gurobi')
     results_multi_opf = solver.solve(model_multi_opf, tee=True)
 
     if nygrid_sim.check_status(results_multi_opf):

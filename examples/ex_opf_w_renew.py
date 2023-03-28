@@ -188,7 +188,6 @@ for d in range(len(timestamp_list)-1):
     nygrid_sim = NYGrid(ppc_filename, 
                         start_datetime=start_datetime.strftime('%m-%d-%Y %H'), 
                         end_datetime=end_datetime.strftime('%m-%d-%Y %H'),
-                        slack_cost_weight=1e21,
                         verbose=True)
 
     # Read grid data
@@ -216,7 +215,7 @@ for d in range(len(timestamp_list)-1):
     nygrid_sim.check_input_dim()
 
     # Initialize single period OPF
-    model_multi_opf = nygrid_sim.create_multi_opf_soft()
+    model_multi_opf = nygrid_sim.create_multi_opf_soft(slack_cost_weight=1e21)
 
     solver = SolverFactory('gurobi')
     results_multi_opf = solver.solve(model_multi_opf, tee=True)

@@ -21,6 +21,7 @@ from pypower.idx_brch import *
 from pypower.idx_cost import *
 from . import utlis as utils
 
+
 class NYGrid:
     """
     Class for running the NYGrid model
@@ -31,11 +32,13 @@ class NYGrid:
 
 
     """
-    def __init__(self, ppc_filename, start_datetime, end_datetime, 
-                 verbose=False):
+
+    def __init__(self, ppc_filename, start_datetime, end_datetime,
+                 slack_cost_weight=1e21, verbose=False):
         self.ppc = pp.loadcase(ppc_filename)
         self.start_datetime = start_datetime
         self.end_datetime = end_datetime
+        self.slack_cost_weight = slack_cost_weight
         self.verbose = verbose
 
         # Format the forecast start/end and determine the total time.
@@ -48,7 +51,8 @@ class NYGrid:
             print(f'NYGrid run ending on: {self.end_datetime}')
             print(f'NYGrid run duration: {self.delt}')
 
-        self.timestamp_list = pd.date_range(self.start_datetime, self.end_datetime, freq='1H')
+        self.timestamp_list = pd.date_range(
+            self.start_datetime, self.end_datetime, freq='1H')
         self.NT = len(self.timestamp_list)
 
         # User-defined parameters
@@ -66,7 +70,7 @@ class NYGrid:
 
         Parameters:
             A tuple of OPF network parameters and constraints.
-        
+
         Returns:
             model (pyomo.core.base.PyomoModel.ConcreteModel): Pyomo model for single-period OPF problem.
         '''
@@ -74,11 +78,14 @@ class NYGrid:
         model = ConcreteModel(name='single-period OPF')
 
         # Define variables
-        model.PG = Var(range(self.NG), within=Reals,initialize=1)  # Real power generation
+        model.PG = Var(range(self.NG), within=Reals,
+                       initialize=1)  # Real power generation
         model.Va = Var(range(self.NB), within=Reals, initialize=0,
-                    bounds=(-2*np.pi, 2*np.pi))  # Bus voltage angle
-        model.PF = Var(range(self.NBR), within=Reals, initialize=0) # Branch power flow
-        model.dual = Suffix(direction=Suffix.IMPORT) # Dual variables for price information
+                       bounds=(-2*np.pi, 2*np.pi))  # Bus voltage angle
+        model.PF = Var(range(self.NBR), within=Reals,
+                       initialize=0)  # Branch power flow
+        # Dual variables for price information
+        model.dual = Suffix(direction=Suffix.IMPORT)
 
         # Define constraints
         model.c_br_flow = ConstraintList()
@@ -93,34 +100,36 @@ class NYGrid:
 
         # Line flow limit constraints
         for br in range(self.NBR):
-            model.c_br_flow.add(model.PF[br] == sum(self.Bf[br, b]*model.Va[b] 
+            model.c_br_flow.add(model.PF[br] == sum(self.Bf[br, b]*model.Va[b]
                                                     for b in range(self.NB)))
             model.c_br_max.add(model.PF[br] <= self.br_max[br])
             model.c_br_min.add(model.PF[br] >= self.br_min[br])
-        
+
         # Generation capacity limit
         for g in range(self.NG):
             model.c_gen_max.add(model.PG[g] <= self.gen_max[g])
             model.c_gen_min.add(model.PG[g] >= self.gen_min[g])
-            
+
         # DC power flow constraint
         for b in range(self.NB):
-            model.c_pf.add(sum(self.gen_map[b, g]*model.PG[g] for g in range(self.NG)) 
-                           - sum(self.load_map[b, l]*self.load_pu[l] for l in range(self.NL))
-                            == sum(self.B[b, b_]*model.Va[b_] for b_ in range(self.NB)))
-        
+            model.c_pf.add(sum(self.gen_map[b, g]*model.PG[g] for g in range(self.NG))
+                           - sum(self.load_map[b, l]*self.load_pu[l]
+                                 for l in range(self.NL))
+                           == sum(self.B[b, b_]*model.Va[b_] for b_ in range(self.NB)))
+
         # DC line power balance constraint
         for idx_f, idx_t in zip(self.dc_idx_f, self.dc_idx_t):
             model.c_dcline.add(model.PG[idx_f] == -model.PG[idx_t])
-        
+
         # Interface flow limits
         for n in range(len(self.if_lims)):
             if_id, if_lims_min, if_lims_max = self.if_lims[n, :]
-            br_dir_idx = self.if_map[(self.if_map[:,0] == int(if_id)), 1]
-            br_dir, br_idx = np.sign(br_dir_idx), np.abs(br_dir_idx).astype(int)
-            model.c_if_max.add(if_lims_max >= sum(br_dir[i]*model.PF[br_idx[i]] 
+            br_dir_idx = self.if_map[(self.if_map[:, 0] == int(if_id)), 1]
+            br_dir, br_idx = np.sign(br_dir_idx), np.abs(
+                br_dir_idx).astype(int)
+            model.c_if_max.add(if_lims_max >= sum(br_dir[i]*model.PF[br_idx[i]]
                                                   for i in range(len(br_idx))))
-            model.c_if_min.add(if_lims_min <= sum(br_dir[i]*model.PF[br_idx[i]] 
+            model.c_if_min.add(if_lims_min <= sum(br_dir[i]*model.PF[br_idx[i]]
                                                   for i in range(len(br_idx))))
 
         def cost(model, gencost_0, gencost_1):
@@ -129,7 +138,7 @@ class NYGrid:
                 + sum(gencost_1[i]*model.PG[i] for i in range(self.NG))
             return cost
 
-        model.obj = Objective(expr=cost(model, self.gencost_0, self.gencost_1), 
+        model.obj = Objective(expr=cost(model, self.gencost_0, self.gencost_1),
                               sense=minimize)
 
         return model
@@ -140,7 +149,7 @@ class NYGrid:
 
         Parameters:
             A tuple of OPF network parameters and constraints.
-        
+
         Returns:
             model (pyomo.core.base.PyomoModel.ConcreteModel): Pyomo model for multi-period OPF problem.
         '''
@@ -153,13 +162,15 @@ class NYGrid:
         model = ConcreteModel(name='multi-period OPF')
 
         # Define variables
-        model.PG = Var(range(self.NT), range(self.NG), 
+        model.PG = Var(range(self.NT), range(self.NG),
                        within=Reals, initialize=1)  # Real power generation
-        model.Va = Var(range(self.NT), range(self.NB), 
+        model.Va = Var(range(self.NT), range(self.NB),
                        within=Reals, initialize=0,
-                    bounds=(-2*np.pi, 2*np.pi))  # Bus phase angle
-        model.PF = Var(range(self.NT), range(self.NBR), within=Reals, initialize=0) # Branch power flow
-        model.dual = Suffix(direction=Suffix.IMPORT) # Dual variables for price information
+                       bounds=(-2*np.pi, 2*np.pi))  # Bus phase angle
+        model.PF = Var(range(self.NT), range(self.NBR),
+                       within=Reals, initialize=0)  # Branch power flow
+        # Dual variables for price information
+        model.dual = Suffix(direction=Suffix.IMPORT)
 
         # Define constraints
         model.c_br_flow = ConstraintList()
@@ -177,7 +188,7 @@ class NYGrid:
         for t in range(self.NT):
             # Line flow limit constraints
             for br in range(self.NBR):
-                model.c_br_flow.add(model.PF[t, br] == sum(self.Bf[br, b]*model.Va[t, b] 
+                model.c_br_flow.add(model.PF[t, br] == sum(self.Bf[br, b]*model.Va[t, b]
                                                            for b in range(self.NB)))
                 model.c_br_max.add(model.PF[t, br] <= self.br_max[br])
                 model.c_br_min.add(model.PF[t, br] >= self.br_min[br])
@@ -189,36 +200,43 @@ class NYGrid:
 
             # DC Power flow constraint
             for b in range(self.NB):
-                model.c_pf.add(sum(self.gen_map[b, g]*model.PG[t, g] for g in range(self.NG)) 
-                               - sum(self.load_map[b, l]*self.load_pu[t, l] for l in range(self.NL))
-                                == sum(self.B[b, b_]*model.Va[t, b_] for b_ in range(self.NB)))
-            
+                model.c_pf.add(sum(self.gen_map[b, g]*model.PG[t, g] for g in range(self.NG))
+                               - sum(self.load_map[b, l]*self.load_pu[t, l]
+                                     for l in range(self.NL))
+                               == sum(self.B[b, b_]*model.Va[t, b_] for b_ in range(self.NB)))
+
             # DC line power balance constraint
             for idx_f, idx_t in zip(self.dc_idx_f, self.dc_idx_t):
                 model.c_dcline.add(model.PG[t, idx_f] == -model.PG[t, idx_t])
 
             # Interface flow limits
+            # Soft constraints with slack variables
             for n in range(len(self.if_lims)):
                 if_id, if_lims_min, if_lims_max = self.if_lims[n, :]
-                br_dir_idx = self.if_map[(self.if_map[:,0] == int(if_id)), 1]
-                br_dir, br_idx = np.sign(br_dir_idx), np.abs(br_dir_idx).astype(int)
-                model.c_if_min.add(if_lims_min <= sum(br_dir[i]*model.PF[t, br_idx[i]] 
+                br_dir_idx = self.if_map[(self.if_map[:, 0] == int(if_id)), 1]
+                br_dir, br_idx = np.sign(br_dir_idx), np.abs(
+                    br_dir_idx).astype(int)
+                model.c_if_min.add(if_lims_min <= sum(br_dir[i]*model.PF[t, br_idx[i]]
                                                       for i in range(len(br_idx))))
-                model.c_if_max.add(if_lims_max >= sum(br_dir[i]*model.PF[t, br_idx[i]] 
+                model.c_if_max.add(if_lims_max >= sum(br_dir[i]*model.PF[t, br_idx[i]]
                                                       for i in range(len(br_idx))))
 
             if t == 0:
                 if self.gen_init is not None:
                     # Ramp rate limit from initial condition
                     for g in range(self.NG):
-                        model.c_gen_ramp_down.add(-model.PG[t, g] + self.gen_init[g] <= self.ramp_down[t, g])
-                        model.c_gen_ramp_up.add(model.PG[t, g] - self.gen_init[g] <= self.ramp_up[t, g])
+                        model.c_gen_ramp_down.add(
+                            -model.PG[t, g] + self.gen_init[g] <= self.ramp_down[t, g])
+                        model.c_gen_ramp_up.add(
+                            model.PG[t, g] - self.gen_init[g] <= self.ramp_up[t, g])
             else:
                 # Ramp rate limit
                 for g in range(self.NG):
-                    model.c_gen_ramp_down.add(-model.PG[t, g] + model.PG[t-1, g] <= self.ramp_down[t, g])
-                    model.c_gen_ramp_up.add(model.PG[t, g] - model.PG[t-1, g] <= self.ramp_up[t, g])
-            
+                    model.c_gen_ramp_down.add(-model.PG[t, g] +
+                                              model.PG[t-1, g] <= self.ramp_down[t, g])
+                    model.c_gen_ramp_up.add(
+                        model.PG[t, g] - model.PG[t-1, g] <= self.ramp_up[t, g])
+
             if self.verbose:
                 timer.toc(f'Created constraints for time step {t} ...')
 
@@ -226,12 +244,132 @@ class NYGrid:
             cost = 0
             for t in range(self.NT):
                 cost += sum(gencost_0[t, g] for g in range(self.NG)) \
-                    + sum(gencost_1[t, g]*model.PG[t, g] for g in range(self.NG))
+                    + sum(gencost_1[t, g]*model.PG[t, g]
+                          for g in range(self.NG))
             return cost
 
-        model.obj = Objective(expr=cost(model, self.gencost_0, self.gencost_1), sense=minimize)
+        model.obj = Objective(
+            expr=cost(model, self.gencost_0, self.gencost_1), sense=minimize)
 
         print('Created model ...')
+
+        return model
+
+    def create_multi_opf_soft(self):
+        '''
+        Multi-period OPF problem.
+
+        Parameters:
+            A tuple of OPF network parameters and constraints.
+
+        Returns:
+            model (pyomo.core.base.PyomoModel.ConcreteModel): Pyomo model for multi-period OPF problem.
+        '''
+        print('Creating multi-period OPF problem ...')
+
+        if self.verbose:
+            timer = TicTocTimer()
+            timer.tic('Starting timer ...')
+
+        model = ConcreteModel(name='multi-period OPF')
+
+        # Define variables
+        model.PG = Var(range(self.NT), range(self.NG),
+                       within=Reals, initialize=1)  # Real power generation
+        model.Va = Var(range(self.NT), range(self.NB),
+                       within=Reals, initialize=0,
+                       bounds=(-2*np.pi, 2*np.pi))  # Bus phase angle
+        model.PF = Var(range(self.NT), range(self.NBR),
+                       within=Reals, initialize=0)  # Branch power flow
+        # Dual variables for price information
+        model.dual = Suffix(direction=Suffix.IMPORT)
+        model.s_if_max = Var(range(self.NT), range(len(self.if_lims)),
+                             within=NonNegativeReals, initialize=1)  # Slack variable for interface flow upper bound
+        model.s_if_min = Var(range(self.NT), range(len(self.if_lims)),
+                             within=NonNegativeReals, initialize=1)  # Slack variable for interface flow lower bound
+
+        # Define constraints
+        model.c_br_flow = ConstraintList()
+        model.c_br_max = ConstraintList()
+        model.c_br_min = ConstraintList()
+        model.c_gen_max = ConstraintList()
+        model.c_gen_min = ConstraintList()
+        model.c_pf = ConstraintList()
+        model.c_gen_ramp_up = ConstraintList()
+        model.c_gen_ramp_down = ConstraintList()
+        model.c_dcline = ConstraintList()
+        model.c_if_max = ConstraintList()
+        model.c_if_min = ConstraintList()
+
+        for t in range(self.NT):
+            # Line flow limit constraints
+            for br in range(self.NBR):
+                model.c_br_flow.add(model.PF[t, br] == sum(self.Bf[br, b]*model.Va[t, b]
+                                                           for b in range(self.NB)))
+                model.c_br_max.add(model.PF[t, br] <= self.br_max[br])
+                model.c_br_min.add(model.PF[t, br] >= self.br_min[br])
+
+            # Generation capacity limit
+            for g in range(self.NG):
+                model.c_gen_max.add(model.PG[t, g] <= self.gen_max[t, g])
+                model.c_gen_min.add(model.PG[t, g] >= self.gen_min[t, g])
+
+            # DC Power flow constraint
+            for b in range(self.NB):
+                model.c_pf.add(sum(self.gen_map[b, g]*model.PG[t, g] for g in range(self.NG))
+                               - sum(self.load_map[b, l]*self.load_pu[t, l] for l in range(self.NL))
+                               == sum(self.B[b, b_]*model.Va[t, b_] for b_ in range(self.NB)))
+
+            # DC line power balance constraint
+            for idx_f, idx_t in zip(self.dc_idx_f, self.dc_idx_t):
+                model.c_dcline.add(model.PG[t, idx_f] == -model.PG[t, idx_t])
+
+            # Interface flow limits
+            # Soft constraints with slack variables
+            for n in range(len(self.if_lims)):
+                if_id, if_lims_min, if_lims_max = self.if_lims[n, :]
+                br_dir_idx = self.if_map[(self.if_map[:, 0] == int(if_id)), 1]
+                br_dir, br_idx = np.sign(br_dir_idx), np.abs(br_dir_idx).astype(int)
+
+                model.c_if_min.add(if_lims_min - model.s_if_min[t, n] <= sum(br_dir[i]*model.PF[t, br_idx[i]]
+                                                      for i in range(len(br_idx))) )
+
+                model.c_if_max.add(if_lims_max + model.s_if_max[t, n] >= sum(br_dir[i]*model.PF[t, br_idx[i]]
+                                                      for i in range(len(br_idx))) )
+
+            if t == 0:
+                if self.gen_init is not None:
+                    # Ramp rate limit from initial condition
+                    for g in range(self.NG):
+                        model.c_gen_ramp_down.add(
+                            -model.PG[t, g] + self.gen_init[g] <= self.ramp_down[t, g])
+                        model.c_gen_ramp_up.add(
+                            model.PG[t, g] - self.gen_init[g] <= self.ramp_up[t, g])
+            else:
+                # Ramp rate limit
+                for g in range(self.NG):
+                    model.c_gen_ramp_down.add(-model.PG[t, g] +
+                                              model.PG[t-1, g] <= self.ramp_down[t, g])
+                    model.c_gen_ramp_up.add(model.PG[t, g] - 
+                                            model.PG[t-1, g] <= self.ramp_up[t, g])
+
+            if self.verbose:
+                timer.toc(f'Created constraints for time step {t} ...')
+
+        def cost(model, gencost_0, gencost_1):
+            cost = 0
+            for t in range(self.NT):
+                cost += sum(gencost_0[t, g] for g in range(self.NG)) \
+                    + sum(gencost_1[t, g]*model.PG[t, g] for g in range(self.NG)) \
+                    + sum(model.s_if_max[t, n] for n in range(len(self.if_lims)))*self.slack_cost_weight \
+                    + sum(model.s_if_min[t, n] for n in range(len(self.if_lims)))*self.slack_cost_weight
+
+            return cost
+
+        model.obj = Objective(
+            expr=cost(model, self.gencost_0, self.gencost_1), sense=minimize)
+
+        print('Created model with soft interface flow limit constraints ...')
 
         return model
 
@@ -242,12 +380,13 @@ class NYGrid:
         Parameters
         ----------
             load_profile (str): Path to load profile csv file.
-            
+
         Returns
         -------
             load (numpy.ndarray): A 2-d array of load at each timestamp at each bus
         '''
-        self.load_profile = load_profile[self.start_datetime:self.end_datetime].to_numpy()
+        self.load_profile = load_profile[self.start_datetime:self.end_datetime].to_numpy(
+        )
 
     def get_gen_data(self, gen_profile):
         '''
@@ -256,12 +395,13 @@ class NYGrid:
         Parameters
         ----------
             gen_profile (str): Path to generation profile csv file.
-            
+
         Returns
         -------
             gen (numpy.ndarray): A 2-d array of generation at each timestamp at each bus
         '''
-        self.gen_profile = gen_profile[self.start_datetime:self.end_datetime].to_numpy()
+        self.gen_profile = gen_profile[self.start_datetime:self.end_datetime].to_numpy(
+        )
 
     def get_genmax_data(self, genmax_profile):
         '''
@@ -270,12 +410,13 @@ class NYGrid:
         Parameters
         ----------
             genmax_profile (str): Path to generation capacity profile csv file.
-            
+
         Returns
         -------
             gen_max (numpy.ndarray): A 2-d array of generation capacity at each bus
         '''
-        self.genmax_profile = genmax_profile[self.start_datetime:self.end_datetime].to_numpy()
+        self.genmax_profile = genmax_profile[self.start_datetime:self.end_datetime].to_numpy(
+        )
 
     def get_genmin_data(self, genmin_profile):
         '''
@@ -284,12 +425,13 @@ class NYGrid:
         Parameters
         ----------
             genmin_profile (str): Path to generation capacity profile csv file.
-            
+
         Returns
         -------
             gen_min (numpy.ndarray): A 2-d array of generation capacity at each bus
         '''
-        self.genmin_profile = genmin_profile[self.start_datetime:self.end_datetime].to_numpy()
+        self.genmin_profile = genmin_profile[self.start_datetime:self.end_datetime].to_numpy(
+        )
 
     def get_genramp_data(self, ramp_profile, interval='30min'):
         '''
@@ -298,7 +440,7 @@ class NYGrid:
         Parameters
         ----------
             ramp_profile (str): Path to ramp rate profile csv file.
-            
+
         Returns
         -------
             ramp_up (numpy.ndarray): A 2-d array of ramp rate at each bus
@@ -307,7 +449,8 @@ class NYGrid:
         # Convert 30min ramp rate to hourly ramp rate
         if interval == '30min':
             ramp_profile = ramp_profile*2
-        self.genramp_profile = ramp_profile[self.start_datetime:self.end_datetime].to_numpy()
+        self.genramp_profile = ramp_profile[self.start_datetime:self.end_datetime].to_numpy(
+        )
 
     def get_gencost_data(self, gencost0_profile, gencost1_profile):
         '''
@@ -318,8 +461,10 @@ class NYGrid:
             gencost0_profile (pandas.DataFrame): A 2-d array of generation cost at each bus
             gencost1_profile (pandas.DataFrame): A 2-d array of generation cost at each bus
         '''
-        self.gencost0_profile = gencost0_profile[self.start_datetime:self.end_datetime].to_numpy()
-        self.gencost1_profile = gencost1_profile[self.start_datetime:self.end_datetime].to_numpy()
+        self.gencost0_profile = gencost0_profile[self.start_datetime:self.end_datetime].to_numpy(
+        )
+        self.gencost1_profile = gencost1_profile[self.start_datetime:self.end_datetime].to_numpy(
+        )
 
     def get_gen_init_data(self, gen_init):
         '''
@@ -344,18 +489,20 @@ class NYGrid:
         ----------
             ppc (dict): PyPower case in python dictionary.
             load (numpy.ndarray): A 2-d array of load at each timestep at each bus
-        
+
         Returns
         -------
             Parameters of the network and constraints.
         '''
-        ##### Constant data
+        # Constant data
         # Remove user functions
         del self.ppc['userfcn']
 
         # Format genfuel and bus_name strings
-        self.ppc['genfuel'] = np.array([str(x[0][0]) for x in self.ppc['genfuel']])
-        self.ppc['bus_name'] = np.array([str(x[0][0]) for x in self.ppc['bus_name']])
+        self.ppc['genfuel'] = np.array(
+            [str(x[0][0]) for x in self.ppc['genfuel']])
+        self.ppc['bus_name'] = np.array(
+            [str(x[0][0]) for x in self.ppc['bus_name']])
 
         # Format interface limit data
         self.ppc['if'] = {
@@ -412,24 +559,28 @@ class NYGrid:
 
         # Line flow limit in p.u.
         self.br_max = self.branch[:, RATE_A]/self.baseMVA
-        # Replace default value 0 to 999
+        # Replace default value 0 to 999.99
         self.br_max[self.br_max == 0] = 999.99
         self.br_min = - self.br_max
 
         # Get interface limit information
         self.if_map = self.ppc_int['if']['map']
         self.if_lims = self.ppc_int['if']['lims']
-        self.if_lims[:,1:] = self.if_lims[:,1:]/self.baseMVA
-        br_dir, br_idx = np.sign(self.if_map[:,1]), np.abs(self.if_map[:,1]).astype(int)
+        self.if_lims[:, 1:] = self.if_lims[:, 1:]/self.baseMVA
+        br_dir, br_idx = np.sign(self.if_map[:, 1]), np.abs(
+            self.if_map[:, 1]).astype(int)
         self.if_map[:, 1] = br_dir*(br_idx-1)
 
-        ##### User defined data
+        # User defined data
         # Historical generation data
         if self.gen_profile is not None:
             self.gen_hist = np.empty((self.NT, self.NG))
-            self.gen_hist[:, self.gen_idx_non_dc] = self.gen_profile/self.baseMVA
-            self.gen_hist[:, self.dc_idx_f] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_f, PG]/self.baseMVA
-            self.gen_hist[:, self.dc_idx_t] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_t, PG]/self.baseMVA
+            self.gen_hist[:,
+                          self.gen_idx_non_dc] = self.gen_profile/self.baseMVA
+            self.gen_hist[:, self.dc_idx_f] = np.ones(
+                (self.NT, self.num_dcline))*self.gen[self.dc_idx_f, PG]/self.baseMVA
+            self.gen_hist[:, self.dc_idx_t] = np.ones(
+                (self.NT, self.num_dcline))*self.gen[self.dc_idx_t, PG]/self.baseMVA
         else:
             self.gen_hist = np.zeros((self.NT, self.NG))
 
@@ -437,56 +588,73 @@ class NYGrid:
         if self.genmax_profile is not None:
             self.gen_max = np.empty((self.NT, self.NG))
             self.gen_max[:, self.gen_idx_non_dc] = self.genmax_profile/self.baseMVA
-            self.gen_max[:, self.dc_idx_f] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_f, PMAX]/self.baseMVA
-            self.gen_max[:, self.dc_idx_t] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_t, PMAX]/self.baseMVA
+            self.gen_max[:, self.dc_idx_f] = np.ones(
+                (self.NT, self.num_dcline))*self.gen[self.dc_idx_f, PMAX]/self.baseMVA
+            self.gen_max[:, self.dc_idx_t] = np.ones(
+                (self.NT, self.num_dcline))*self.gen[self.dc_idx_t, PMAX]/self.baseMVA
         else:
-            self.gen_max = np.ones((self.NT, self.NG))*self.gen[:, PMAX]/self.baseMVA
+            self.gen_max = np.ones((self.NT, self.NG)) * \
+                self.gen[:, PMAX]/self.baseMVA
 
          # Generator lower operating limit in p.u.
         if self.genmin_profile is not None:
             self.gen_min = np.empty((self.NT, self.NG))
             self.gen_min[:, self.gen_idx_non_dc] = self.genmin_profile/self.baseMVA
-            self.gen_min[:, self.dc_idx_f] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_f, PMIN]/self.baseMVA
-            self.gen_min[:, self.dc_idx_t] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_t, PMIN]/self.baseMVA
+            self.gen_min[:, self.dc_idx_f] = np.ones(
+                (self.NT, self.num_dcline))*self.gen[self.dc_idx_f, PMIN]/self.baseMVA
+            self.gen_min[:, self.dc_idx_t] = np.ones(
+                (self.NT, self.num_dcline))*self.gen[self.dc_idx_t, PMIN]/self.baseMVA
         else:
-            self.gen_min = np.ones((self.NT, self.NG))*self.gen[:, PMIN]/self.baseMVA
+            self.gen_min = np.ones((self.NT, self.NG)) * \
+                self.gen[:, PMIN]/self.baseMVA
 
         # Generator ramp rate limit in p.u.
-        if self.genramp_profile is not None:         
+        if self.genramp_profile is not None:
             self.ramp_up = np.empty((self.NT, self.NG))
             self.ramp_up[:, self.gen_idx_non_dc] = self.genramp_profile/self.baseMVA
-            self.ramp_up[:, self.dc_idx_f] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_f, RAMP_30]*2/self.baseMVA
-            self.ramp_up[:, self.dc_idx_t] = np.ones((self.NT, self.num_dcline))*self.gen[self.dc_idx_t, RAMP_30]*2/self.baseMVA
+            self.ramp_up[:, self.dc_idx_f] = np.ones(
+                (self.NT, self.num_dcline))*self.gen[self.dc_idx_f, RAMP_30]*2/self.baseMVA
+            self.ramp_up[:, self.dc_idx_t] = np.ones(
+                (self.NT, self.num_dcline))*self.gen[self.dc_idx_t, RAMP_30]*2/self.baseMVA
 
             self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
         else:
-            self.ramp_up = np.ones((self.NT, self.NG))*self.gen[:, RAMP_30]*2/self.baseMVA
+            self.ramp_up = np.ones((self.NT, self.NG)) * \
+                self.gen[:, RAMP_30]*2/self.baseMVA
             self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
 
         # Linear cost intercept coefficients in p.u.
-        if self.gencost0_profile is not None:           
+        if self.gencost0_profile is not None:
             self.gencost_0 = np.empty((self.NT, self.NG))
             self.gencost_0[:, self.gen_idx_non_dc] = self.gencost0_profile
-            self.gencost_0[:, self.dc_idx_f] = np.ones((self.NT, self.num_dcline))*self.gencost[self.dc_idx_f, COST+1]
-            self.gencost_0[:, self.dc_idx_t] = np.ones((self.NT, self.num_dcline))*self.gencost[self.dc_idx_t, COST+1]
+            self.gencost_0[:, self.dc_idx_f] = np.ones(
+                (self.NT, self.num_dcline))*self.gencost[self.dc_idx_f, COST+1]
+            self.gencost_0[:, self.dc_idx_t] = np.ones(
+                (self.NT, self.num_dcline))*self.gencost[self.dc_idx_t, COST+1]
 
         else:
-            self.gencost_0 = np.ones((self.NT, self.NG))*self.gencost[:, COST+1]
+            self.gencost_0 = np.ones(
+                (self.NT, self.NG))*self.gencost[:, COST+1]
 
         # Linear cost slope coefficients in p.u.
-        if self.gencost1_profile is not None:           
+        if self.gencost1_profile is not None:
             self.gencost_1 = np.empty((self.NT, self.NG))
-            self.gencost_1[:, self.gen_idx_non_dc] = self.gencost1_profile*self.baseMVA
-            self.gencost_1[:, self.dc_idx_f] = np.ones((self.NT, self.num_dcline))*self.gencost[self.dc_idx_f, COST]*self.baseMVA
-            self.gencost_1[:, self.dc_idx_t] = np.ones((self.NT, self.num_dcline))*self.gencost[self.dc_idx_t, COST]*self.baseMVA
+            self.gencost_1[:,
+                           self.gen_idx_non_dc] = self.gencost1_profile*self.baseMVA
+            self.gencost_1[:, self.dc_idx_f] = np.ones(
+                (self.NT, self.num_dcline))*self.gencost[self.dc_idx_f, COST]*self.baseMVA
+            self.gencost_1[:, self.dc_idx_t] = np.ones(
+                (self.NT, self.num_dcline))*self.gencost[self.dc_idx_t, COST]*self.baseMVA
         else:
-            self.gencost_1 = np.ones((self.NT, self.NG))*self.gencost[:, COST]*self.baseMVA
-            
+            self.gencost_1 = np.ones(
+                (self.NT, self.NG))*self.gencost[:, COST]*self.baseMVA
+
         # Convert load to p.u.
         if self.load_profile is not None:
             self.load_pu = self.load_profile/self.baseMVA
         else:
-            self.load_pu = np.ones((self.NT, self.NL))*self.bus[:, PD]/self.baseMVA
+            self.load_pu = np.ones((self.NT, self.NL)) * \
+                self.bus[:, PD]/self.baseMVA
             Warning("No load profile is provided. Using default load profile.")
 
     def check_status(self, results):
@@ -495,7 +663,7 @@ class NYGrid:
 
         Parameters:
             results (pyomo.opt.results.results_.SolverResults): Pyomo model results.
-        
+
         Returns:
             status (bool): True if the model is solved successfully.
         '''
@@ -508,17 +676,17 @@ class NYGrid:
             raise RuntimeError("The problem is infeasible!")
         else:
             status = False
-            print (str(results.solver))
+            print(str(results.solver))
             raise RuntimeError("Something else is wrong!")
         return status
-    
+
     def convert_dcline_2_gen(self):
         '''
         Convert DC lines to generators and add their parameters in the PyPower matrices.
 
         Parameters:
             ppc (dict): PyPower case dictionary.
-        
+
         Returns:
             ppc (dict): updated PyPower case dictionary.
             num_dcline (float): number of DC lines.
@@ -552,28 +720,31 @@ class NYGrid:
         # Set gen parameters of the DC line converted generators
         num_dcline = dcline.shape[0]
         dcline_gen = np.zeros((num_dcline*2, 21))
-        dcline_gen[:, GEN_BUS] = np.concatenate([dcline[:, DC_F_BUS], 
-                                                    dcline[:, DC_T_BUS]])
+        dcline_gen[:, GEN_BUS] = np.concatenate([dcline[:, DC_F_BUS],
+                                                 dcline[:, DC_T_BUS]])
         dcline_gen[:, PG] = np.concatenate([-dcline[:, DC_PF],
                                             dcline[:, DC_PF]])
         dcline_gen[:, QG] = np.concatenate([-dcline[:, DC_QF],
                                             dcline[:, DC_QF]])
         dcline_gen[:, QMAX] = np.concatenate([dcline[:, DC_QMAXF],
-                                            dcline[:, DC_QMAXT]])
+                                              dcline[:, DC_QMAXT]])
         dcline_gen[:, QMIN] = np.concatenate([dcline[:, DC_QMINF],
-                                            dcline[:, DC_QMINT]])
+                                              dcline[:, DC_QMINT]])
         dcline_gen[:, VG] = np.concatenate([dcline[:, DC_VF],
                                             dcline[:, DC_VT]])
         dcline_gen[:, MBASE] = np.ones(num_dcline*2)*baseMVA
         dcline_gen[:, GEN_STATUS] = np.concatenate([dcline[:, DC_BR_STATUS],
                                                     dcline[:, DC_BR_STATUS]])
         dcline_gen[:, PMAX] = np.concatenate([dcline[:, DC_PMAX],
-                                            dcline[:, DC_PMAX]])
+                                              dcline[:, DC_PMAX]])
         dcline_gen[:, PMIN] = np.concatenate([dcline[:, DC_PMIN],
-                                            dcline[:, DC_PMIN]])
-        dcline_gen[:, RAMP_AGC] = np.ones(num_dcline*2)*1e10 # Unlimited ramp rate
-        dcline_gen[:, RAMP_10] = np.ones(num_dcline*2)*1e10 # Unlimited ramp rate
-        dcline_gen[:, RAMP_30] = np.ones(num_dcline*2)*1e10 # Unlimited ramp rate
+                                              dcline[:, DC_PMIN]])
+        dcline_gen[:, RAMP_AGC] = np.ones(
+            num_dcline*2)*1e10  # Unlimited ramp rate
+        dcline_gen[:, RAMP_10] = np.ones(
+            num_dcline*2)*1e10  # Unlimited ramp rate
+        dcline_gen[:, RAMP_30] = np.ones(
+            num_dcline*2)*1e10  # Unlimited ramp rate
         # Add the DC line converted generators to the gen matrix
         ppc_dc['gen'] = np.concatenate([gen, dcline_gen])
 
@@ -593,12 +764,14 @@ class NYGrid:
     def check_input_dim(self):
         # Check dimensions of the input data
         if (self.gen_min.shape != self.gen_max.shape) \
-            or (self.ramp_down.shape != self.ramp_up.shape):
-            raise ValueError('Found mismatch in generator constraint dimensions!')
-            
+                or (self.ramp_down.shape != self.ramp_up.shape):
+            raise ValueError(
+                'Found mismatch in generator constraint dimensions!')
+
         if (self.br_min.shape != self.br_max.shape):
-            raise ValueError('Found mismatch in branch flow limit array dimensions!')
-        
+            raise ValueError(
+                'Found mismatch in branch flow limit array dimensions!')
+
     def get_results_single_opf(self, model_single_opf):
         '''
         Get results for a single-period OPF problem.
@@ -606,7 +779,7 @@ class NYGrid:
         Parameters:
             model_multi (Pyomo model): Pyomo model of single-period OPF problem.
             ppc_int (dict): a dict of PyPower case with internal indexing.
-        
+
         Returns:
             results (dict): a dict of pandas Series, including:
                 1. Generator power generation.
@@ -619,7 +792,7 @@ class NYGrid:
         results_pg = np.array(model_single_opf.PG[:]())*self.baseMVA
         gen_order = self.ppc_int['order']['gen']['e2i']
         results_pg = pd.Series(results_pg, index=gen_order).sort_index()
-        
+
         # Bus phase angle
         results_va = np.array(model_single_opf.Va[:]())*180/np.pi
         # Just to compare with PyPower
@@ -636,15 +809,19 @@ class NYGrid:
         if_flow = np.zeros(len(self.if_lims))
         for n in range(len(self.if_lims)):
             if_id = self.if_lims[n, 0]
-            br_dir_idx = self.if_map[(self.if_map[:,0] == int(if_id)), 1]
-            br_dir, br_idx = np.sign(br_dir_idx), np.abs(br_dir_idx).astype(int)
-            if_flow[n] = sum(br_dir[i]*branch_pf[br_idx[i]-1] for i in range(len(br_idx)))
-            if_flow[n] = sum(br_dir[i]*branch_pf[br_idx[i]-1] for i in range(len(br_idx)))
+            br_dir_idx = self.if_map[(self.if_map[:, 0] == int(if_id)), 1]
+            br_dir, br_idx = np.sign(br_dir_idx), np.abs(
+                br_dir_idx).astype(int)
+            if_flow[n] = sum(br_dir[i]*branch_pf[br_idx[i]-1]
+                             for i in range(len(br_idx)))
+            if_flow[n] = sum(br_dir[i]*branch_pf[br_idx[i]-1]
+                             for i in range(len(br_idx)))
         results_if = pd.Series(if_flow)
 
         bus_lmp = np.zeros(self.NB)
         for i in range(self.NB):
-            bus_lmp[i] = np.abs(model_single_opf.dual[model_single_opf.c_pf[i+1]])/self.baseMVA
+            bus_lmp[i] = np.abs(
+                model_single_opf.dual[model_single_opf.c_pf[i+1]])/self.baseMVA
         results_lmp = pd.Series(bus_lmp)
 
         results_single_opf = {
@@ -665,7 +842,7 @@ class NYGrid:
             model_multi (Pyomo model): Pyomo model of multi-period OPF problem.
             ppc_int (dict): a dict of PyPower case with internal indexing.
             timestamp_list (list): a list of timestamps.
-        
+
         Returns:
             results (dict): a dict of pandas DataFrames, including:
                 1. Generator power generation.
@@ -673,15 +850,18 @@ class NYGrid:
                 3. Branch power flow.
                 4. Interface flow.
                 5. Bus locational marginal price (LMP).
+                6. Total cost.
         '''
         # Power generation
-        results_pg = np.array(model_multi_opf.PG[:,:]()).reshape(self.NT, self.NG)*self.baseMVA
+        results_pg = np.array(model_multi_opf.PG[:, :]()).reshape(
+            self.NT, self.NG)*self.baseMVA
         gen_order = self.ppc_int['order']['gen']['e2i']
         results_pg = pd.DataFrame(results_pg, index=self.timestamp_list,
-                                    columns=gen_order).sort_index(axis=1)
-        
+                                  columns=gen_order).sort_index(axis=1)
+
         # Bus phase angle
-        results_va = np.array(model_multi_opf.Va[:,:]()).reshape(self.NT, self.NB)*180/np.pi
+        results_va = np.array(model_multi_opf.Va[:, :]()).reshape(
+            self.NT, self.NB)*180/np.pi
         # Just to compare with PyPower
         results_va = results_va - 73.4282
         # Convert negative numbers to 0-360
@@ -689,7 +869,8 @@ class NYGrid:
         results_va = pd.DataFrame(results_va, index=self.timestamp_list)
 
         # Branch power flow
-        branch_pf = np.array(model_multi_opf.PF[:,:]()).reshape(self.NT, self.NBR)*self.baseMVA
+        branch_pf = np.array(model_multi_opf.PF[:, :]()).reshape(
+            self.NT, self.NBR)*self.baseMVA
         results_pf = pd.DataFrame(branch_pf, index=self.timestamp_list)
 
         # Interface flow
@@ -697,24 +878,36 @@ class NYGrid:
         for t in range(self.NT):
             for n in range(len(self.if_lims)):
                 if_id = self.if_lims[n, 0]
-                br_dir_idx = self.if_map[(self.if_map[:,0] == int(if_id)), 1]
-                br_dir, br_idx = np.sign(br_dir_idx), np.abs(br_dir_idx).astype(int)
-                if_flow[t, n] = sum(br_dir[i]*branch_pf[t, br_idx[i]-1] for i in range(len(br_idx)))
-                if_flow[t, n] = sum(br_dir[i]*branch_pf[t, br_idx[i]-1] for i in range(len(br_idx)))
+                br_dir_idx = self.if_map[(self.if_map[:, 0] == int(if_id)), 1]
+                br_dir, br_idx = np.sign(br_dir_idx), np.abs(
+                    br_dir_idx).astype(int)
+                if_flow[t, n] = sum(br_dir[i]*branch_pf[t, br_idx[i]-1]
+                                    for i in range(len(br_idx)))
+                if_flow[t, n] = sum(br_dir[i]*branch_pf[t, br_idx[i]-1]
+                                    for i in range(len(br_idx)))
         results_if = pd.DataFrame(if_flow, index=self.timestamp_list)
 
         bus_lmp = np.zeros(self.NT*self.NB)
         for i in range(self.NT*self.NB):
-            bus_lmp[i] = np.abs(model_multi_opf.dual[model_multi_opf.c_pf[i+1]])/self.baseMVA
+            bus_lmp[i] = np.abs(
+                model_multi_opf.dual[model_multi_opf.c_pf[i+1]])/self.baseMVA
         results_lmp = bus_lmp.reshape(self.NT, self.NB)
         results_lmp = pd.DataFrame(results_lmp, index=self.timestamp_list)
+
+        # Total cost
+        pg_pu = np.array(model_multi_opf.PG[:,:]()).reshape(self.NT, self.NG)
+        cost = 0
+        for t in range(self.NT):
+            for g in range(self.NG):
+                cost += self.gencost_0[t, g] + self.gencost_1[t, g]*pg_pu[t, g]
 
         results = {
             'PG': results_pg,
             'VA': results_va,
             'PF': results_pf,
             'IF': results_if,
-            'LMP': results_lmp
+            'LMP': results_lmp,
+            'COST': cost
         }
 
         return results
@@ -729,21 +922,21 @@ class NYGrid:
         print('Number of time periods: {}'.format(self.NT))
 
         num_vars = len(model_multi_opf.PG) \
-                    + len(model_multi_opf.Va) \
-                    + len(model_multi_opf.PF)
+            + len(model_multi_opf.Va) \
+            + len(model_multi_opf.PF)
         print('Number of variables: {}'.format(num_vars))
 
         num_constraints = len(model_multi_opf.c_br_flow) \
-                    + len(model_multi_opf.c_br_max) \
-                    + len(model_multi_opf.c_br_min) \
-                    + len(model_multi_opf.c_gen_max) \
-                    + len(model_multi_opf.c_gen_min) \
-                    + len(model_multi_opf.c_pf) \
-                    + len(model_multi_opf.c_gen_ramp_up) \
-                    + len(model_multi_opf.c_gen_ramp_down) \
-                    + len(model_multi_opf.c_dcline) \
-                    + len(model_multi_opf.c_if_max) \
-                    + len(model_multi_opf.c_if_min)
+            + len(model_multi_opf.c_br_max) \
+            + len(model_multi_opf.c_br_min) \
+            + len(model_multi_opf.c_gen_max) \
+            + len(model_multi_opf.c_gen_min) \
+            + len(model_multi_opf.c_pf) \
+            + len(model_multi_opf.c_gen_ramp_up) \
+            + len(model_multi_opf.c_gen_ramp_down) \
+            + len(model_multi_opf.c_dcline) \
+            + len(model_multi_opf.c_if_max) \
+            + len(model_multi_opf.c_if_min)
         print('Number of constraints: {}'.format(num_constraints))
 
     def get_last_gen(self, model_multi_opf):
@@ -754,6 +947,7 @@ class NYGrid:
         # Get dimensions of the last simulation
         NT = len(model_multi_opf.PG_index_0)
         NG = len(model_multi_opf.PG_index_1)
-        results_pg = np.array(model_multi_opf.PG[:,:]()).reshape(NT, NG)*self.baseMVA
+        results_pg = np.array(model_multi_opf.PG[:, :]()).reshape(
+            NT, NG)*self.baseMVA
         last_gen = results_pg[-1, :]
         return last_gen

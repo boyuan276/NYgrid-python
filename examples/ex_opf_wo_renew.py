@@ -74,6 +74,12 @@ gencost1_profile = pd.read_csv(os.path.join(grid_data_dir, f'gencost1_profile_{s
                            parse_dates=['TimeStamp'], index_col='TimeStamp')
 gencost1_profile.index.freq = 'H'
 
+# %% Read thermal generator info table
+filename = os.path.join(data_dir, 'genInfo.csv')
+gen_info = pd.read_csv(filename)
+num_thermal = gen_info.shape[0]
+gen_rename = {gen_info.index[i]: gen_info.NYISOName[i] for i in range(num_thermal)}
+
 # %% Set up OPF model
 timestamp_list = pd.date_range(start_date, end_date, freq='1D')
 
@@ -122,33 +128,28 @@ for d in range(len(timestamp_list)-1):
     results_multi_opf = solver.solve(model_multi_opf, tee=True)
 
     if nygrid_sim.check_status(results_multi_opf):
-        print('%.2f' % model_multi_opf.obj())
+        print(f'Objective: {model_multi_opf.obj():.4e}')
 
-    # %% Process results
-    results = nygrid_sim.get_results_multi_opf(model_multi_opf)
+        # %% Process results
+        results = nygrid_sim.get_results_multi_opf(model_multi_opf)
+        print(f'Cost: {results["COST"]:.4e}')
 
-    # Read thermal generator info table
-    filename = os.path.join(data_dir, 'genInfo.csv')
-    gen_info = pd.read_csv(filename)
-    num_thermal = gen_info.shape[0]
-    gen_rename = {gen_info.index[i]: gen_info.NYISOName[i] for i in range(num_thermal)}
+        # Format thermal generation results
+        results_pg = results['PG']
+        thermal_pg = results_pg.iloc[:, :num_thermal]
+        thermal_pg = thermal_pg.rename(columns=gen_rename)
+        thermal_pg.index.name = 'TimeStamp'
 
-    # Format thermal generation results
-    results_pg = results['PG']
-    thermal_pg = results_pg.iloc[:, :num_thermal]
-    thermal_pg = thermal_pg.rename(columns=gen_rename)
-    thermal_pg.index.name = 'TimeStamp'
+        # Save thermal generation to CSV
+        filename = f'thermal_wo_renew_{start_datetime.strftime("%Y%m%d%H")}_{end_datetime.strftime("%Y%m%d%H")}.csv'
+        thermal_pg.to_csv(os.path.join(results_dir, 'wo_renew', filename))
+        print(f'Saved thermal generation results in {filename}')
 
-    # Save thermal generation to CSV
-    filename = f'thermal_wo_renew_{start_datetime.strftime("%Y%m%d%H")}_{end_datetime.strftime("%Y%m%d%H")}.csv'
-    thermal_pg.to_csv(os.path.join(results_dir, 'wo_renew', filename))
-    print(f'Saved thermal generation results in {filename}')
-
-    # Save simulation results to pickle
-    filename = f'nygrid_sim_wo_renew_{start_datetime.strftime("%Y%m%d%H")}_{end_datetime.strftime("%Y%m%d%H")}.pkl'
-    with open(os.path.join(results_dir, 'wo_renew', filename), 'wb') as f:
-        pickle.dump([nygrid_sim, model_multi_opf, results], f)
-    print(f'Saved simulation results in {filename}')
-    elapsed = time.time() - t
-    print(f'Elapsed time: {elapsed:.2f} seconds')
-    print('-----------------------------------------------------------------')
+        # Save simulation results to pickle
+        filename = f'nygrid_sim_wo_renew_{start_datetime.strftime("%Y%m%d%H")}_{end_datetime.strftime("%Y%m%d%H")}.pkl'
+        with open(os.path.join(results_dir, 'wo_renew', filename), 'wb') as f:
+            pickle.dump([nygrid_sim, model_multi_opf, results], f)
+        print(f'Saved simulation results in {filename}')
+        elapsed = time.time() - t
+        print(f'Elapsed time: {elapsed:.2f} seconds')
+        print('-----------------------------------------------------------------')

@@ -56,7 +56,6 @@ load_profile = pd.read_csv(os.path.join(grid_data_dir, f'load_profile_{start_dat
                            parse_dates=['TimeStamp'], index_col='TimeStamp')
 load_profile.index.freq = 'H'
 
-
 # Read generation profile
 gen_profile = pd.read_csv(os.path.join(grid_data_dir, f'gen_profile_{start_date.year}.csv'), 
                            parse_dates=['TimeStamp'], index_col='TimeStamp')
@@ -168,6 +167,12 @@ ext_renewable = ext_load_profile * ny_renewable_pct
 load_profile_renewable = load_profile_renewable.subtract(ext_renewable, fill_value=0)
 load_profile_renewable.index = load_profile.index
 
+# %% Read thermal generator info table
+filename = os.path.join(data_dir, 'genInfo.csv')
+gen_info = pd.read_csv(filename)
+num_thermal = gen_info.shape[0]
+gen_rename = {gen_info.index[i]: gen_info.NYISOName[i] for i in range(num_thermal)}
+
 # %% Set up OPF model
 timestamp_list = pd.date_range(start_date, end_date, freq='1D')
 
@@ -182,7 +187,8 @@ for d in range(len(timestamp_list)-1):
 
     nygrid_sim = NYGrid(ppc_filename, 
                         start_datetime=start_datetime.strftime('%m-%d-%Y %H'), 
-                        end_datetime=end_datetime.strftime('%m-%d-%Y %H'), 
+                        end_datetime=end_datetime.strftime('%m-%d-%Y %H'),
+                        slack_cost_weight=1e21,
                         verbose=True)
 
     # Read grid data
@@ -210,39 +216,34 @@ for d in range(len(timestamp_list)-1):
     nygrid_sim.check_input_dim()
 
     # Initialize single period OPF
-    model_multi_opf = nygrid_sim.create_multi_opf()
+    model_multi_opf = nygrid_sim.create_multi_opf_soft()
 
-    solver = SolverFactory('glpk')
+    solver = SolverFactory('gurobi')
     results_multi_opf = solver.solve(model_multi_opf, tee=True)
 
     if nygrid_sim.check_status(results_multi_opf):
-        print('%.2f' % model_multi_opf.obj())
+        print(f'Objective: {model_multi_opf.obj():.4e}')
 
-    # %% Process results
-    results = nygrid_sim.get_results_multi_opf(model_multi_opf)
+        # %% Process results
+        results = nygrid_sim.get_results_multi_opf(model_multi_opf)
+        print(f'Cost: {results["COST"]:.4e}')
 
-    # Read thermal generator info table
-    filename = os.path.join(data_dir, 'genInfo.csv')
-    gen_info = pd.read_csv(filename)
-    num_thermal = gen_info.shape[0]
-    gen_rename = {gen_info.index[i]: gen_info.NYISOName[i] for i in range(num_thermal)}
+        # Format thermal generation results
+        results_pg = results['PG']
+        thermal_pg = results_pg.iloc[:, :num_thermal]
+        thermal_pg = thermal_pg.rename(columns=gen_rename)
+        thermal_pg.index.name = 'TimeStamp'
 
-    # Format thermal generation results
-    results_pg = results['PG']
-    thermal_pg = results_pg.iloc[:, :num_thermal]
-    thermal_pg = thermal_pg.rename(columns=gen_rename)
-    thermal_pg.index.name = 'TimeStamp'
+        # Save thermal generation to CSV
+        filename = f'thermal_w_renew_{start_datetime.strftime("%Y%m%d%H")}_{end_datetime.strftime("%Y%m%d%H")}.csv'
+        thermal_pg.to_csv(os.path.join(results_dir, 'w_renew', filename))
+        print(f'Saved thermal generation results in {filename}')
 
-    # Save thermal generation to CSV
-    filename = f'thermal_w_renew_{start_datetime.strftime("%Y%m%d%H")}_{end_datetime.strftime("%Y%m%d%H")}.csv'
-    thermal_pg.to_csv(os.path.join(results_dir, 'w_renew', filename))
-    print(f'Saved thermal generation results in {filename}')
-
-    # Save simulation results to pickle
-    filename = f'nygrid_sim_w_renew_{start_datetime.strftime("%Y%m%d%H")}_{end_datetime.strftime("%Y%m%d%H")}.pkl'
-    with open(os.path.join(results_dir, 'w_renew', filename), 'wb') as f:
-        pickle.dump([nygrid_sim, model_multi_opf, results], f)
-    print(f'Saved simulation results in {filename}')
-    elapsed = time.time() - t
-    print(f'Elapsed time: {elapsed:.2f} seconds')
-    print('-----------------------------------------------------------------')
+        # Save simulation results to pickle
+        filename = f'nygrid_sim_w_renew_{start_datetime.strftime("%Y%m%d%H")}_{end_datetime.strftime("%Y%m%d%H")}.pkl'
+        with open(os.path.join(results_dir, 'w_renew', filename), 'wb') as f:
+            pickle.dump([nygrid_sim, model_multi_opf, results], f)
+        print(f'Saved simulation results in {filename}')
+        elapsed = time.time() - t
+        print(f'Elapsed time: {elapsed:.2f} seconds')
+        print('-----------------------------------------------------------------')

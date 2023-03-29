@@ -53,8 +53,8 @@ buildings_data_dir = os.path.join(data_dir, 'buildings')
 print('Buildings data directory: {}'.format(buildings_data_dir))
 
 # %% Read grid data
-start_date = datetime(2018, 1, 6, 0, 0, 0)
-end_date = datetime(2018, 1, 10, 0, 0, 0)
+start_date = datetime(2018, 1, 1, 0, 0, 0)
+end_date = datetime(2019, 1, 1, 0, 0, 0)
 timestamp_list = pd.date_range(start_date, end_date, freq='1D')
 
 # Read load profile
@@ -250,7 +250,7 @@ for d in range(len(timestamp_list)-1):
     nygrid_sim = NYGrid(ppc_filename, 
                         start_datetime=start_datetime.strftime('%m-%d-%Y %H'), 
                         end_datetime=end_datetime.strftime('%m-%d-%Y %H'),
-                        verbose=False)
+                        verbose=True)
 
     # Read grid data
     nygrid_sim.get_load_data(load_profile_renewable)

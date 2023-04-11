@@ -14,7 +14,7 @@ conda env create -f NYgrid-python.yml
 ```
 5. Activate the environment:
 ```
-source activate NYgrid-python
+conda activate NYgrid-python
 ```
 6. Install the package:
 ```

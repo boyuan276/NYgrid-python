@@ -5,6 +5,7 @@ data/offshore_wind
 data/buildings
 figures/
 results/
+.idea/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

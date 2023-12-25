@@ -8,7 +8,8 @@ Known Issues/Wishlist:
 
 """
 
-from pyomo.environ import *
+from pyomo.environ import (ConcreteModel, Var, Constraint, ConstraintList, Objective,
+                           Reals, NonNegativeReals, minimize, Suffix)
 from pyomo.opt import SolverStatus, TerminationCondition
 from pyomo.common.timing import TicTocTimer
 import numpy as np
@@ -24,17 +25,31 @@ from . import utlis as utils
 
 class NYGrid:
     """
-    Class for running the NYGrid model
-
-    Parameters
-    ----------
-    :param 
-
+    Class for running the NYGrid model.
 
     """
 
     def __init__(self, ppc_filename, start_datetime, end_datetime,
                  verbose=False):
+        """
+        Initialize the NYGrid model.
+
+        Parameters
+        ----------
+        ppc_filename: str
+            Path to the PyPower case file.
+        start_datetime: str
+            Start datetime of the simulation.
+        end_datetime: str
+            End datetime of the simulation.
+        verbose: bool
+            If True, print out the information of the simulation.
+
+        Returns
+        -------
+        None
+        """
+
         self.ppc = pp.loadcase(ppc_filename)
         self.start_datetime = start_datetime
         self.end_datetime = end_datetime
@@ -50,8 +65,7 @@ class NYGrid:
             print(f'NYGrid run ending on: {self.end_datetime}')
             print(f'NYGrid run duration: {self.delt}')
 
-        self.timestamp_list = pd.date_range(
-            self.start_datetime, self.end_datetime, freq='1H')
+        self.timestamp_list = pd.date_range(self.start_datetime, self.end_datetime, freq='1H')
         self.NT = len(self.timestamp_list)
 
         # User-defined parameters
@@ -64,7 +78,7 @@ class NYGrid:
         self.gencost1_profile = None
 
     def create_single_opf(self):
-        '''
+        """
         Single-period OPF problem.
 
         Parameters:
@@ -72,7 +86,7 @@ class NYGrid:
 
         Returns:
             model (pyomo.core.base.PyomoModel.ConcreteModel): Pyomo model for single-period OPF problem.
-        '''
+        """
 
         model = ConcreteModel(name='single-period OPF')
 
@@ -143,7 +157,7 @@ class NYGrid:
         return model
 
     def create_multi_opf(self):
-        '''
+        """
         Multi-period OPF problem.
 
         Parameters:
@@ -151,7 +165,7 @@ class NYGrid:
 
         Returns:
             model (pyomo.core.base.PyomoModel.ConcreteModel): Pyomo model for multi-period OPF problem.
-        '''
+        """
         print('Creating multi-period OPF problem ...')
 
         if self.verbose:
@@ -255,7 +269,7 @@ class NYGrid:
         return model
 
     def create_multi_opf_soft(self, slack_cost_weight=1e21):
-        '''
+        """
         Multi-period OPF problem.
 
         Parameters:
@@ -263,7 +277,7 @@ class NYGrid:
 
         Returns:
             model (pyomo.core.base.PyomoModel.ConcreteModel): Pyomo model for multi-period OPF problem.
-        '''
+        """
         print('Creating multi-period OPF problem ...')
 
         if self.verbose:
@@ -385,7 +399,7 @@ class NYGrid:
         return model
 
     def get_load_data(self, load_profile):
-        '''
+        """
         Get load data from load profile.
 
         Parameters
@@ -395,12 +409,12 @@ class NYGrid:
         Returns
         -------
             load (numpy.ndarray): A 2-d array of load at each timestamp at each bus
-        '''
+        """
         self.load_profile = load_profile[self.start_datetime:self.end_datetime].to_numpy(
         )
 
     def get_gen_data(self, gen_profile):
-        '''
+        """
         Get generation data from generation profile.
 
         Parameters
@@ -410,12 +424,12 @@ class NYGrid:
         Returns
         -------
             gen (numpy.ndarray): A 2-d array of generation at each timestamp at each bus
-        '''
+        """
         self.gen_profile = gen_profile[self.start_datetime:self.end_datetime].to_numpy(
         )
 
     def get_genmax_data(self, genmax_profile):
-        '''
+        """
         Get generation capacity data from generation capacity profile.
 
         Parameters
@@ -425,12 +439,12 @@ class NYGrid:
         Returns
         -------
             gen_max (numpy.ndarray): A 2-d array of generation capacity at each bus
-        '''
+        """
         self.genmax_profile = genmax_profile[self.start_datetime:self.end_datetime].to_numpy(
         )
 
     def get_genmin_data(self, genmin_profile):
-        '''
+        """
         Get generation capacity data from generation capacity profile.
 
         Parameters
@@ -440,12 +454,12 @@ class NYGrid:
         Returns
         -------
             gen_min (numpy.ndarray): A 2-d array of generation capacity at each bus
-        '''
+        """
         self.genmin_profile = genmin_profile[self.start_datetime:self.end_datetime].to_numpy(
         )
 
     def get_genramp_data(self, ramp_profile, interval='30min'):
-        '''
+        """
         Get ramp rate data from ramp rate profile.
 
         Parameters
@@ -456,7 +470,7 @@ class NYGrid:
         -------
             ramp_up (numpy.ndarray): A 2-d array of ramp rate at each bus
             ramp_down (numpy.ndarray): A 2-d array of ramp rate at each bus
-        '''
+        """
         # Convert 30min ramp rate to hourly ramp rate
         if interval == '30min':
             ramp_profile = ramp_profile*2
@@ -464,28 +478,28 @@ class NYGrid:
         )
 
     def get_gencost_data(self, gencost0_profile, gencost1_profile):
-        '''
+        """
         Get generation cost data from generation cost profile.
 
         Parameters
         ----------
             gencost0_profile (pandas.DataFrame): A 2-d array of generation cost at each bus
             gencost1_profile (pandas.DataFrame): A 2-d array of generation cost at each bus
-        '''
+        """
         self.gencost0_profile = gencost0_profile[self.start_datetime:self.end_datetime].to_numpy(
         )
         self.gencost1_profile = gencost1_profile[self.start_datetime:self.end_datetime].to_numpy(
         )
 
     def get_gen_init_data(self, gen_init):
-        '''
+        """
         Get generator initial condition.
 
         Parameters
         ----------
             gen_init (numpy.ndarray): A 1-d array of generator initial condition
 
-        '''
+        """
 
         if gen_init is not None:
             self.gen_init = gen_init/self.baseMVA
@@ -493,7 +507,7 @@ class NYGrid:
             self.gen_init = None
 
     def process_ppc(self):
-        '''
+        """
         Process PyPower case to get constraint value for the OPF problem.
 
         Parameters
@@ -504,7 +518,7 @@ class NYGrid:
         Returns
         -------
             Parameters of the network and constraints.
-        '''
+        """
         # Constant data
         # Remove user functions
         del self.ppc['userfcn']
@@ -669,7 +683,7 @@ class NYGrid:
             Warning("No load profile is provided. Using default load profile.")
 
     def check_status(self, results):
-        '''
+        """
         Check the status of a Pyomo model.
 
         Parameters:
@@ -677,7 +691,7 @@ class NYGrid:
 
         Returns:
             status (bool): True if the model is solved successfully.
-        '''
+        """
 
         if (results.solver.status == SolverStatus.ok) and (results.solver.termination_condition == TerminationCondition.optimal):
             status = True
@@ -692,7 +706,7 @@ class NYGrid:
         return status
 
     def convert_dcline_2_gen(self):
-        '''
+        """
         Convert DC lines to generators and add their parameters in the PyPower matrices.
 
         Parameters:
@@ -701,7 +715,7 @@ class NYGrid:
         Returns:
             ppc (dict): updated PyPower case dictionary.
             num_dcline (float): number of DC lines.
-        '''
+        """
 
         # Define dcline matrix indices
         DC_F_BUS = 0
@@ -784,7 +798,7 @@ class NYGrid:
                 'Found mismatch in branch flow limit array dimensions!')
 
     def get_results_single_opf(self, model_single_opf):
-        '''
+        """
         Get results for a single-period OPF problem.
 
         Parameters:
@@ -798,7 +812,7 @@ class NYGrid:
                 3. Branch power flow.
                 4. Interface flow.
                 5. Bus locational marginal price (LMP).
-        '''
+        """
         # Power generation
         results_pg = np.array(model_single_opf.PG[:]())*self.baseMVA
         gen_order = self.ppc_int['order']['gen']['e2i']
@@ -846,7 +860,7 @@ class NYGrid:
         return results_single_opf
 
     def get_results_multi_opf(self, model_multi_opf):
-        '''
+        """
         Get results for a multi-period OPF problem.
 
         Parameters:
@@ -862,7 +876,7 @@ class NYGrid:
                 4. Interface flow.
                 5. Bus locational marginal price (LMP).
                 6. Total cost.
-        '''
+        """
         # Power generation
         results_pg = np.array(model_multi_opf.PG[:, :]()).reshape(
             self.NT, self.NG)*self.baseMVA
@@ -924,9 +938,9 @@ class NYGrid:
         return results
 
     def show_model_dim(self, model_multi_opf):
-        '''
+        """
         Show model dimensions.
-        '''
+        """
         print('Number of buses: {}'.format(self.NB))
         print('Number of generators: {}'.format(self.NG))
         print('Number of branches: {}'.format(self.NBR))
@@ -951,10 +965,10 @@ class NYGrid:
         print('Number of constraints: {}'.format(num_constraints))
 
     def get_last_gen(self, model_multi_opf):
-        '''
+        """
         Get generator power generation at the last simulation.
         Used to create initial condition for the next simulation.
-        '''
+        """
         # Get dimensions of the last simulation
         NT = len(model_multi_opf.PG_index_0)
         NG = len(model_multi_opf.PG_index_1)

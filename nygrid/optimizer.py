@@ -12,60 +12,28 @@ from pypower.idx_brch import *
 from pypower.idx_cost import *
 from . import utlis as utils
 import logging
+from run_nygrid import NYGrid
 
 
 class Optimizer:
 
-    def __init__(self, ppc_filename, start_datetime, end_datetime,
-                 verbose=False):
+    def __init__(self, nygrid):
         """
         Initialize the NYGrid model.
 
         Parameters
         ----------
-        ppc_filename: str
-            Path to the PyPower case file.
-        start_datetime: str
-            Start datetime of the simulation.
-        end_datetime: str
-            End datetime of the simulation.
-        verbose: bool
-            If True, print out the information of the simulation.
+        nygrid : NYGrid
+            NYGrid simulation model.
 
         Returns
         -------
         None
         """
 
-        # self.ppc = pp.loadcase(ppc_filename)
-        # self.start_datetime = start_datetime
-        # self.end_datetime = end_datetime
-        # self.verbose = verbose
-        #
-        # # Format the forecast start/end and determine the total time.
-        # self.start_datetime = utils.format_date(start_datetime)
-        # self.end_datetime = utils.format_date(end_datetime)
-        # self.delt = self.end_datetime - self.start_datetime
-        # if self.verbose:
-        #     logging.info('Initializing NYGrid run...')
-        #     logging.info(f'NYGrid run starting on: {self.start_datetime}')
-        #     logging.info(f'NYGrid run ending on: {self.end_datetime}')
-        #     logging.info(f'NYGrid run duration: {self.delt}')
-        #
-        # self.timestamp_list = pd.date_range(self.start_datetime, self.end_datetime, freq='1H')
-        # self.NT = len(self.timestamp_list)
-
         # Define pyomo model
+        self.nygrid = nygrid
         self.model = ConcreteModel(name='multi-period OPF')
-
-        # User-defined time series data
-        self.load_sch = None
-        self.gen_mw_sch = None
-        self.gen_max_sch = None
-        self.gen_min_sch = None
-        self.gen_ramp_sch = None
-        self.gen_cost0_sch = None
-        self.gen_cost1_sch = None
 
         # User-defined initial condition
         self.gen_init = None
@@ -146,8 +114,7 @@ class Optimizer:
         self.gen_cost0_sch = gen_cost0_sch
         self.gen_cost1_sch = gen_cost1_sch
 
-    def set_ed_params(self, load_pu, gen_max, gen_min, ramp_up, ramp_down,
-                        gencost_0, gencost_1):
+    def set_ed_params(self):
         """
         Set the ED module parameters.
 
@@ -164,13 +131,13 @@ class Optimizer:
 
         """
 
-        self.load_pu = load_pu
-        self.gen_max = gen_max
-        self.gen_min = gen_min
-        self.ramp_up = ramp_up
-        self.ramp_down = ramp_down
-        self.gencost_0 = gencost_0
-        self.gencost_1 = gencost_1
+        self.load_pu = self.nygrid.load_pu
+        self.gen_max = self.nygrid.gen_max
+        self.gen_min = self.nygrid.gen_min
+        self.ramp_up = self.nygrid.ramp_up
+        self.ramp_down = self.nygrid.ramp_down
+        self.gencost_0 = self.nygrid.gencost_0
+        self.gencost_1 = self.nygrid.gencost_1
 
     def set_uc_params(self, gen_init, esr_init):
         """

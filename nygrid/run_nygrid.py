@@ -20,8 +20,26 @@ from pypower.idx_bus import *
 from pypower.idx_gen import *
 from pypower.idx_brch import *
 from pypower.idx_cost import *
-from . import utlis as utils
+from utlis import format_date
+from optimizer import Optimizer
 import logging
+
+# Define PyPower dc line matrix indices
+DC_F_BUS = 0
+DC_T_BUS = 1
+DC_BR_STATUS = 2
+DC_PF = 3
+DC_PT = 4
+DC_QF = 5
+DC_QT = 6
+DC_VF = 7
+DC_VT = 8
+DC_PMIN = 9
+DC_PMAX = 10
+DC_QMINF = 11
+DC_QMAXF = 12
+DC_QMINT = 13
+DC_QMAXT = 14
 
 
 def check_status(results):
@@ -47,6 +65,68 @@ def check_status(results):
         print(str(results.solver))
         raise RuntimeError("Something else is wrong!")
     return status
+
+
+def convert_dcline_2_gen(ppc):
+    """
+    Convert DC lines to generators and add their parameters in the PyPower matrices.
+
+    Parameters:
+        ppc (dict): PyPower case dictionary.
+
+    Returns:
+        ppc (dict): updated PyPower case dictionary.
+        num_dcline (float): number of DC lines.
+    """
+
+    # Get PyPower case information
+    ppc_dc = ppc.copy()
+    baseMVA = ppc_dc['baseMVA']
+    gen = ppc_dc['gen']
+    gencost = ppc_dc['gencost']
+    dcline = ppc_dc['dcline']
+    genfuel = ppc_dc['genfuel']
+
+    # Set gen parameters of the DC line converted generators
+    num_dcline = dcline.shape[0]
+    dcline_gen = np.zeros((num_dcline * 2, 21))
+    dcline_gen[:, GEN_BUS] = np.concatenate([dcline[:, DC_F_BUS],
+                                             dcline[:, DC_T_BUS]])
+    dcline_gen[:, PG] = np.concatenate([-dcline[:, DC_PF],
+                                        dcline[:, DC_PF]])
+    dcline_gen[:, QG] = np.concatenate([-dcline[:, DC_QF],
+                                        dcline[:, DC_QF]])
+    dcline_gen[:, QMAX] = np.concatenate([dcline[:, DC_QMAXF],
+                                          dcline[:, DC_QMAXT]])
+    dcline_gen[:, QMIN] = np.concatenate([dcline[:, DC_QMINF],
+                                          dcline[:, DC_QMINT]])
+    dcline_gen[:, VG] = np.concatenate([dcline[:, DC_VF],
+                                        dcline[:, DC_VT]])
+    dcline_gen[:, MBASE] = np.ones(num_dcline * 2) * baseMVA
+    dcline_gen[:, GEN_STATUS] = np.concatenate([dcline[:, DC_BR_STATUS],
+                                                dcline[:, DC_BR_STATUS]])
+    dcline_gen[:, PMAX] = np.concatenate([dcline[:, DC_PMAX],
+                                          dcline[:, DC_PMAX]])
+    dcline_gen[:, PMIN] = np.concatenate([dcline[:, DC_PMIN],
+                                          dcline[:, DC_PMIN]])
+    dcline_gen[:, RAMP_AGC] = np.ones(num_dcline * 2) * 1e10  # Unlimited ramp rate
+    dcline_gen[:, RAMP_10] = np.ones(num_dcline * 2) * 1e10  # Unlimited ramp rate
+    dcline_gen[:, RAMP_30] = np.ones(num_dcline * 2) * 1e10  # Unlimited ramp rate
+    # Add the DC line converted generators to the gen matrix
+    ppc_dc['gen'] = np.concatenate([gen, dcline_gen])
+
+    # Set gencost parameters of the DC line converted generators
+    dcline_gencost = np.zeros((num_dcline * 2, 6))
+    dcline_gencost[:, MODEL] = np.ones(num_dcline * 2) * POLYNOMIAL
+    dcline_gencost[:, NCOST] = np.ones(num_dcline * 2) * 2
+    # Add the DC line converted generators to the gencost matrix
+    ppc_dc['gencost'] = np.concatenate([gencost, dcline_gencost])
+
+    # Add the DC line converted generators to the genfuel list
+    dcline_genfuel = ['dc line'] * num_dcline * 2
+    ppc_dc['genfuel'] = np.concatenate([genfuel, dcline_genfuel])
+
+    return ppc_dc, num_dcline
 
 
 class NYGrid:
@@ -76,65 +156,124 @@ class NYGrid:
         None
         """
 
+        # %% Load PyPower case
         self.ppc = pp.loadcase(ppc_filename)
+
+        # %% Set the start and end datetime of the simulation
         self.start_datetime = start_datetime
         self.end_datetime = end_datetime
         self.verbose = verbose
 
         # Format the forecast start/end and determine the total time.
-        self.start_datetime = utils.format_date(start_datetime)
-        self.end_datetime = utils.format_date(end_datetime)
-        self.delt = self.end_datetime - self.start_datetime
+        self.start_datetime = format_date(start_datetime)
+        self.end_datetime = format_date(end_datetime)
+        self.delta_t = self.end_datetime - self.start_datetime
+        self.timestamp_list = pd.date_range(self.start_datetime, self.end_datetime, freq='1H')
+        self.NT = len(self.timestamp_list)
+
         if self.verbose:
             logging.info('Initializing NYGrid run...')
             logging.info(f'NYGrid run starting on: {self.start_datetime}')
             logging.info(f'NYGrid run ending on: {self.end_datetime}')
-            logging.info(f'NYGrid run duration: {self.delt}')
+            logging.info(f'NYGrid run duration: {self.delta_t}')
 
-        self.timestamp_list = pd.date_range(self.start_datetime, self.end_datetime, freq='1H')
-        self.NT = len(self.timestamp_list)
+        # %% Process PyPower case constant fields
+        # Remove user functions
+        del self.ppc['userfcn']
 
-        # Define pyomo model
-        self.model = ConcreteModel(name='multi-period OPF')
+        # Format genfuel and bus_name strings
+        self.ppc['genfuel'] = np.array([str(x[0][0]) for x in self.ppc['genfuel']])
+        self.ppc['bus_name'] = np.array([str(x[0][0]) for x in self.ppc['bus_name']])
 
-        # User-defined time series data
-        self.load_sch = None
-        self.gen_mw_sch = None
-        self.gen_max_sch = None
-        self.gen_min_sch = None
-        self.gen_ramp_sch = None
-        self.gen_cost0_sch = None
-        self.gen_cost1_sch = None
+        # Format interface limit data
+        self.ppc['if'] = {
+            'map': self.ppc['if'][0][0][0],
+            'lims': self.ppc['if'][0][0][1]
+        }
+        self.ppc = pp.toggle_iflims(self.ppc, 'on')
 
-        # User-defined initial condition
-        self.gen_init = None
-        self.esr_init = None
+        # Convert baseMVA to float
+        self.ppc['baseMVA'] = float(self.ppc['baseMVA'])
 
-        # Penalty parameters and default values
-        # ED module
-        self.NoPowerBalanceViolation = False
-        self.NoRampViolation = False
-        self.PenaltyForOverGeneration = 1_500  # $/MWh
-        self.PenaltyForLoadShed = 5_000  # $/MWh
-        self.PenaltyForRampViolation = 11_000  # $/MW
-        # UC module
-        self.PenaltyForMinTimeViolation = 1_000  # $/MWh
-        self.PenaltyForNumberCommitViolation = 10_000  # $/hour
-        # RS module
-        self.NoReserveViolation = False
-        self.PenaltyForReserveViolation = 1_300  # $/MW
-        self.NoImplicitReserveCascading = False
-        self.OfflineReserveNotFromOnline = False
-        # PF module
-        self.NoPowerflowViolation = False
-        self.SlackBusName = None
-        self.SystemBaseMVA = 100  # MVA
-        self.HvdcHurdleCost = 0.10  # $/MWh
-        self.PenaltyForBranchMwViolation = 1_000  # $/MWh
-        self.PenaltyForInterfaceMWViolation = 1_000  # $/MWh
-        self.MaxPhaseAngleDifference = 1.5  # Radians
-        # ES module
-        self.PenaltyForEnergyStorageViolation = 8_000  # $/MWh
+        # Convert DC line to generators and add to gen matrix
+        self.ppc_dc, self.num_dcline = convert_dcline_2_gen(self.ppc)
+
+        # Convert to internal indexing
+        self.ppc_int = pp.ext2int(self.ppc_dc)
+        # self.ppc_int = self.ppc_dc
+
+        self.baseMVA = self.ppc_int['baseMVA']
+        self.bus = self.ppc_int['bus']
+        self.gen = self.ppc_int['gen']
+        self.branch = self.ppc_int['branch']
+        self.gencost = self.ppc_int['gencost']
+
+        # Generator info
+        self.gen_bus = self.gen[:, GEN_BUS].astype(int)  # what buses are they at?
+
+        # build B matrices and phase shift injections
+        B, Bf, _, _ = pp.makeBdc(self.baseMVA, self.bus, self.branch)
+        self.B = B.todense()
+        self.Bf = Bf.todense()
+
+        # Problem dimensions
+        self.NG = self.gen.shape[0]  # Number of generators
+        self.NB = self.bus.shape[0]  # Number of buses
+        self.NBR = self.branch.shape[0]  # Number of lines
+        self.NL = np.count_nonzero(self.bus[:, PD])  # Number of loads
+
+        # Get mapping from generator to bus
+        self.gen_map = np.zeros((self.NB, self.NG))
+        self.gen_map[self.gen_bus, range(self.NG)] = 1
+
+        # Get index of DC line converted generators in internal indexing
+        self.gen_i2e = self.ppc_int['order']['gen']['i2e']
+        self.dc_idx_f = self.gen_i2e[self.NG - self.num_dcline * 2: self.NG - self.num_dcline]
+        self.dc_idx_t = self.gen_i2e[self.NG - self.num_dcline: self.NG]
+        self.gen_idx_non_dc = self.gen_i2e[:self.NG - self.num_dcline * 2]
+
+        # Get mapping from load to bus
+        self.load_map = np.zeros((self.NB, self.NL))
+        self.load_bus = np.nonzero(self.bus[:, PD])[0]
+        for i in range(len(self.load_bus)):
+            self.load_map[self.load_bus[i], i] = 1
+
+        # Line flow limit in p.u.
+        self.br_max = self.branch[:, RATE_A] / self.baseMVA
+        # Replace default value 0 to 999.99
+        self.br_max[self.br_max == 0] = 999.99
+        self.br_min = - self.br_max
+
+        # Get interface limit information
+        self.if_map = self.ppc_int['if']['map']
+        self.if_lims = self.ppc_int['if']['lims']
+        self.if_lims[:, 1:] = self.if_lims[:, 1:] / self.baseMVA
+        br_dir, br_idx = np.sign(self.if_map[:, 1]), np.abs(
+            self.if_map[:, 1]).astype(int)
+        self.if_map[:, 1] = br_dir * (br_idx - 1)
+
+        # Historical generation data. Use zero as default values
+        self.gen_hist = np.zeros((self.NT, self.NG))
+
+        # Generator upper operating limit in p.u.
+        self.gen_max = np.ones((self.NT, self.NG)) * self.gen[:, PMAX] / self.baseMVA
+
+        # Generator lower operating limit in p.u.
+        self.gen_min = np.ones((self.NT, self.NG)) * self.gen[:, PMIN] / self.baseMVA
+
+        # Generator ramp rate limit in p.u./hour
+        self.ramp_up = np.ones((self.NT, self.NG)) * self.gen[:, RAMP_30] * 2 / self.baseMVA
+        # Downward ramp rate is the minimum of the upward ramp rate and the maximum generation limit
+        self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
+
+        # Linear cost intercept coefficients in p.u.
+        self.gencost_0 = np.ones((self.NT, self.NG)) * self.gencost[:, COST + 1]
+
+        # Linear cost slope coefficients in p.u.
+        self.gencost_1 = np.ones((self.NT, self.NG)) * self.gencost[:, COST] * self.baseMVA
+
+        # Convert load to p.u.
+        self.load_pu = np.ones((self.NT, self.NL)) * self.bus[:, PD] / self.baseMVA
 
     def get_penalty_params(self, penalty_params):
 
@@ -463,265 +602,203 @@ class NYGrid:
 
         return model
 
-    def create_multi_opf_soft_new(self, slack_cost_weight=1e21):
-        """
-        Multi-period OPF problem.
-
-        Parameters:
-            A tuple of OPF network parameters and constraints.
-
-        Returns:
-            model (pyomo.core.base.PyomoModel.ConcreteModel): Pyomo model for multi-period OPF problem.
-        """
-
-        # %% Define variables
-
-        # Generator real power output
-        self.model.PG = Var(range(self.NT), range(self.NG),
-                            within=Reals, initialize=1)
-        # Bus phase angle
-        self.model.Va = Var(range(self.NT), range(self.NB),
-                            within=Reals, initialize=0,
-                            bounds=(-2 * np.pi, 2 * np.pi))
-        # Branch power flow
-        self.model.PF = Var(range(self.NT), range(self.NBR),
-                            within=Reals, initialize=0)
-
-        # Dual variables for price information
-        self.model.dual = Suffix(direction=Suffix.IMPORT)
-
-        # Slack variables for soft constraints
-        # Slack variable for interface flow upper bound
-        self.model.s_if_max = Var(range(self.NT), range(len(self.if_lims)),
-                                  within=NonNegativeReals, initialize=0)
-        # Slack variable for interface flow lower bound
-        self.model.s_if_min = Var(range(self.NT), range(len(self.if_lims)),
-                                  within=NonNegativeReals, initialize=0)
-        # Slack variable for branch flow upper bound
-        self.model.s_br_max = Var(range(self.NT), range(self.NBR),
-                                  within=NonNegativeReals, initialize=0)
-        # Slack variable for branch flow lower bound
-        self.model.s_br_min = Var(range(self.NT), range(self.NBR),
-                                  within=NonNegativeReals, initialize=0)
-
-        # %% Define objective function
-
-        # Generator energy cost
-        def gen_cost_ene_expr(model, gencost_0, gencost_1):
-            return sum(gencost_0[t, g] + gencost_1[t, g] * model.PG[t, g]
-                       for g in range(self.NG) for t in range(self.NT))
-
-        # Penalty for violating interface flow limits
-        def if_penalty_expr(model, penalty_for_if_violation):
-            return sum(model.s_if_max[t, n] + model.s_if_min[t, n]
-                       for n in range(len(self.if_lims)) for t in range(self.NT)) * penalty_for_if_violation
-
-        # Penalty for violating branch flow limits
-        def br_penalty_expr(model, penalty_for_br_violation):
-            return sum(model.s_br_max[t, n] + model.s_br_min[t, n]
-                       for n in range(self.NBR) for t in range(self.NT)) * penalty_for_br_violation
-
-        # TODO: Remove slack cost weight and change to penalty for violating interface flow limits
-        # TODO: Add penalty for over generation and penalty for load shed
-        # TODO: Add penalty for ramp violation
-        self.model.obj = Objective(expr=(gen_cost_ene_expr(self.model, self.gencost_0, self.gencost_1)
-                                         + if_penalty_expr(self.model, self.PenaltyForInterfaceMWViolation)
-                                         + br_penalty_expr(self.model, self.PenaltyForBranchMwViolation)),
-                                   sense=minimize)
-
-        # %% Define constraints
-
-        # 1.1. Branch flow definition
-        def branch_flow_rule(model, t, br):
-            return model.PF[t, br] == sum(self.Bf[br, b] * model.Va[t, b]
-                                          for b in range(self.NB))
-
-        self.model.c_br_flow = Constraint(range(self.NT), range(self.NBR),
-                                          rule=branch_flow_rule)
-
-        # 1.2. Branch flow upper limit
-        def branch_flow_max_rule(model, t, br):
-            return model.PF[t, br] <= self.br_max[br] + model.s_br_max[t, br]
-
-        self.model.c_br_max = Constraint(range(self.NT), range(self.NBR),
-                                         rule=branch_flow_max_rule)
-
-        # 1.3. Branch flow lower limit
-        def branch_flow_min_rule(model, t, br):
-            return - model.PF[t, br] <= - self.br_min[br] + model.s_br_min[t, br]
-
-        self.model.c_br_min = Constraint(range(self.NT), range(self.NBR),
-                                         rule=branch_flow_min_rule)
-
-        # 2.1. Generator real power output upper limit
-        def gen_power_max_rule(model, t, g):
-            return model.PG[t, g] <= self.gen_max[t, g]
-
-        self.model.c_gen_max = Constraint(range(self.NT), range(self.NG),
-                                          rule=gen_power_max_rule)
-
-        # 2.2. Generator real power output lower limit
-        def gen_power_min_rule(model, t, g):
-            return - model.PG[t, g] <= - self.gen_min[t, g]
-
-        self.model.c_gen_min = Constraint(range(self.NT), range(self.NG),
-                                          rule=gen_power_min_rule)
-
-        # 3.1. Generator ramp rate downward limit
-        def gen_ramp_rate_down_rule(model, t, g):
-            if t == 0:
-                if self.gen_init is not None:
-                    return - model.PG[t, g] + self.gen_init[g] <= self.ramp_down[t, g]
-                else:
-                    return Constraint.Skip
-            else:
-                return - model.PG[t, g] + model.PG[t - 1, g] <= self.ramp_down[t, g]
-
-        self.model.c_gen_ramp_down = Constraint(range(self.NT), range(self.NG),
-                                                rule=gen_ramp_rate_down_rule)
-
-        # 3.2. Generator ramp rate limit
-        def gen_ramp_rate_up_rule(model, t, g):
-            if t == 0:
-                if self.gen_init is not None:
-                    return model.PG[t, g] - self.gen_init[g] <= self.ramp_up[t, g]
-                else:
-                    return Constraint.Skip
-            else:
-                return model.PG[t, g] - model.PG[t - 1, g] <= self.ramp_up[t, g]
-
-        self.model.c_gen_ramp_up = Constraint(range(self.NT), range(self.NG),
-                                              rule=gen_ramp_rate_up_rule)
-
-        # 4.1. DC power flow constraint
-        def dc_power_flow_rule(model, t, b):
-            return sum(self.gen_map[b, g] * model.PG[t, g] for g in range(self.NG)) \
-                - sum(self.load_map[b, l] * self.load_pu[t, l] for l in range(self.NL)) \
-                == sum(self.B[b, b_] * model.Va[t, b_] for b_ in range(self.NB))
-
-        self.model.c_pf = Constraint(range(self.NT), range(self.NB),
-                                     rule=dc_power_flow_rule)
-
-        # 4.2. DC line power balance constraint
-        def dc_line_power_balance_rule(model, t, idx_f, idx_t):
-            return model.PG[t, idx_f] == - model.PG[t, idx_t]
-
-        self.model.c_dcline = Constraint(range(self.NT), range(self.NDC),
-                                         rule=dc_line_power_balance_rule)
-
-        # 5.1. Interface flow upper limit
-        def interface_flow_max_rule(model, t, n):
-            if_id, if_lims_min, if_lims_max = self.if_lims[n, :]
-            br_dir_idx = self.if_map[(self.if_map[:, 0] == int(if_id)), 1]
-            br_dir, br_idx = np.sign(br_dir_idx), np.abs(
-                br_dir_idx).astype(int)
-            return if_lims_max >= sum(br_dir[i] * model.PF[t, br_idx[i]]
-                                      for i in range(len(br_idx))) + model.s_if_max[t, n]
-
-        self.model.c_if_max = Constraint(range(self.NT), range(len(self.if_lims)),
-                                         rule=interface_flow_max_rule)
-
-        # 5.2. Interface flow lower limit
-        def interface_flow_min_rule(model, t, n):
-            if_id, if_lims_min, if_lims_max = self.if_lims[n, :]
-            br_dir_idx = self.if_map[(self.if_map[:, 0] == int(if_id)), 1]
-            br_dir, br_idx = np.sign(br_dir_idx), np.abs(
-                br_dir_idx).astype(int)
-            return if_lims_min <= sum(br_dir[i] * model.PF[t, br_idx[i]]
-                                      for i in range(len(br_idx))) + model.s_if_min[t, n]
-
-        self.model.c_if_min = Constraint(range(self.NT), range(len(self.if_lims)),
-                                         rule=interface_flow_min_rule)
-
-        logging.debug('Created model with soft interface flow limit constraints ...')
-
     def ts_set_load_sch(self, load_sch):
         """
-        Get load data from load profile.
+        Set load schedule data from load profile.
 
         Parameters
         ----------
-            load_sch (str): Path to load profile csv file.
+        load_sch: pandas.DataFrame
+            Load profile of the network.
 
         Returns
         -------
-            load_sch (numpy.ndarray): A 2-d array of load at each timestamp at each bus
+        None
         """
-        self.load_sch = load_sch[self.start_datetime:self.end_datetime].to_numpy()
+
+        # Slice the load profile to the simulation period
+        load_sch = load_sch[self.start_datetime:self.end_datetime].to_numpy()
+
+        # Convert load to p.u.
+        if load_sch is not None and load_sch.size > 0:
+            self.load_pu = load_sch / self.baseMVA
+        else:
+            raise ValueError('No load profile is provided.')
 
     def ts_set_gen_mw_sch(self, gen_mw_sch):
         """
-        Get generation data from generation profile.
+        Set generator schedule data from generation profile.
 
         Parameters
         ----------
-            gen_mw_sch (str): Path to generation profile csv file.
+        gen_mw_sch: pandas.DataFrame
+            Generation profile of thermal generators.
 
         Returns
         -------
-            gen (numpy.ndarray): A 2-d array of generation at each timestamp at each bus
+        None
         """
-        self.gen_mw_sch = gen_mw_sch[self.start_datetime:self.end_datetime].to_numpy()
+
+        # Slice the generation profile to the simulation period
+        gen_mw_sch = gen_mw_sch[self.start_datetime:self.end_datetime].to_numpy()
+
+        # Generator schedule in p.u.
+        if gen_mw_sch is not None and gen_mw_sch.size > 0:
+            # Thermal generators: Use user-defined time series schedule
+            self.gen_hist = np.empty((self.NT, self.NG))
+            self.gen_hist[:, self.gen_idx_non_dc] = gen_mw_sch / self.baseMVA
+            # HVDC Proxy generators: Use default values from the PyPower case
+            self.gen_hist[:, self.dc_idx_f] = np.ones(
+                (self.NT, self.num_dcline)) * self.gen[self.dc_idx_f, PG] / self.baseMVA
+            self.gen_hist[:, self.dc_idx_t] = np.ones(
+                (self.NT, self.num_dcline)) * self.gen[self.dc_idx_t, PG] / self.baseMVA
+        else:
+            raise ValueError('No generation profile is provided.')
 
     def ts_set_gen_max_sch(self, gen_max_sch):
         """
-        Get generation capacity data from generation capacity profile.
+        Set generator upper operating limit data from generation capacity profile.
 
         Parameters
         ----------
-            gen_max_sch (str): Path to generation capacity profile csv file.
+        gen_max_sch: pandas.DataFrame
+            Generator upper operating limit profile of thermal generators.
 
         Returns
         -------
-            gen_max (numpy.ndarray): A 2-d array of generation capacity at each bus
+        None
         """
-        self.gen_max_sch = gen_max_sch[self.start_datetime:self.end_datetime].to_numpy()
+
+        # Slice the generator profile to the simulation period
+        gen_max_sch = gen_max_sch[self.start_datetime:self.end_datetime].to_numpy()
+
+        # Generator upper operating limit in p.u.
+        if gen_max_sch is not None and gen_max_sch.size > 0:
+            # Thermal generators: Use user-defined time series schedule
+            self.gen_max = np.empty((self.NT, self.NG))
+            self.gen_max[:, self.gen_idx_non_dc] = gen_max_sch / self.baseMVA
+            # HVDC Proxy generators: Use default values from the PyPower case
+            self.gen_max[:, self.dc_idx_f] = np.ones(
+                (self.NT, self.num_dcline)) * self.gen[self.dc_idx_f, PMAX] / self.baseMVA
+            self.gen_max[:, self.dc_idx_t] = np.ones(
+                (self.NT, self.num_dcline)) * self.gen[self.dc_idx_t, PMAX] / self.baseMVA
+        else:
+            raise ValueError('No generation capacity profile is provided.')
 
     def ts_set_gen_min_sch(self, gen_min_sch):
         """
-        Get generation capacity data from generation capacity profile.
+        Set generator lower operating limit data from generation capacity profile.
 
         Parameters
         ----------
-            gen_min_sch (str): Path to generation capacity profile csv file.
+        gen_min_sch: pandas.DataFrame
+            Generator lower operating limit profile of thermal generators.
 
         Returns
         -------
-            gen_min (numpy.ndarray): A 2-d array of generation capacity at each bus
+        None
         """
-        self.gen_min_sch = gen_min_sch[self.start_datetime:self.end_datetime].to_numpy()
+
+        # Slice the generator profile to the simulation period
+        gen_min_sch = gen_min_sch[self.start_datetime:self.end_datetime].to_numpy()
+
+        # Generator lower operating limit in p.u.
+        if gen_min_sch is not None and gen_min_sch.size > 0:
+            # Thermal generators: Use user-defined time series schedule
+            self.gen_min = np.empty((self.NT, self.NG))
+            self.gen_min[:, self.gen_idx_non_dc] = gen_min_sch / self.baseMVA
+            # HVDC Proxy generators: Use default values from the PyPower case
+            self.gen_min[:, self.dc_idx_f] = np.ones(
+                (self.NT, self.num_dcline)) * self.gen[self.dc_idx_f, PMIN] / self.baseMVA
+            self.gen_min[:, self.dc_idx_t] = np.ones(
+                (self.NT, self.num_dcline)) * self.gen[self.dc_idx_t, PMIN] / self.baseMVA
+        else:
+            raise ValueError('No generation capacity profile is provided.')
 
     def ts_set_gen_ramp_sch(self, gen_ramp_sch, interval='30min'):
         """
-        Get ramp rate data from ramp rate profile.
+        Set generator ramp rate limit data from ramp rate profile.
 
         Parameters
         ----------
-            gen_ramp_sch (str): Path to ramp rate profile csv file.
+        gen_ramp_sch: pandas.DataFrame
+            Generator ramp rate limit profile of thermal generators.
+        interval: str
+            Time interval of the ramp rate profile. Default is 30min.
 
         Returns
         -------
-            ramp_up (numpy.ndarray): A 2-d array of ramp rate at each bus
-            ramp_down (numpy.ndarray): A 2-d array of ramp rate at each bus
+        None
         """
+
         # Convert 30min ramp rate to hourly ramp rate
         if interval == '30min':
             gen_ramp_sch = gen_ramp_sch * 2
-            self.gen_ramp_sch = gen_ramp_sch[self.start_datetime:self.end_datetime].to_numpy()
+            gen_ramp_sch = gen_ramp_sch[self.start_datetime:self.end_datetime].to_numpy()
         else:
             raise ValueError('Only support 30min ramp rate profile.')
 
+        # Generator ramp rate limit in p.u./hour
+        if gen_ramp_sch is not None and gen_ramp_sch.size > 0:
+            # Thermal generators: Use user-defined time series schedule
+            self.ramp_up = np.empty((self.NT, self.NG))
+            self.ramp_up[:, self.gen_idx_non_dc] = gen_ramp_sch / self.baseMVA
+            # HVDC Proxy generators: Use default values from the PyPower case
+            self.ramp_up[:, self.dc_idx_f] = np.ones(
+                (self.NT, self.num_dcline)) * self.gen[self.dc_idx_f, RAMP_30] * 2 / self.baseMVA
+            self.ramp_up[:, self.dc_idx_t] = np.ones(
+                (self.NT, self.num_dcline)) * self.gen[self.dc_idx_t, RAMP_30] * 2 / self.baseMVA
+        else:
+            raise ValueError('No ramp rate profile is provided.')
+
+        # Downward ramp rate is the minimum of the upward ramp rate and the maximum generation limit
+        self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
+
     def ts_set_gen_cost_sch(self, gen_cost0_sch, gen_cost1_sch):
         """
-        Get generation cost data from generation cost profile.
+        Set generator cost data from generation cost profile.
 
         Parameters
         ----------
-            gen_cost0_sch (pandas.DataFrame): A 2-d array of generation cost at each bus
-            gen_cost1_sch (pandas.DataFrame): A 2-d array of generation cost at each bus
+        gen_cost0_sch: pandas.DataFrame
+            Generator cost intercept profile of thermal generators.
+        gen_cost1_sch: pandas.DataFrame
+            Generator cost slope profile of thermal generators.
+
+        Returns
+        -------
+        None
         """
-        self.gen_cost0_sch = gen_cost0_sch[self.start_datetime:self.end_datetime].to_numpy()
-        self.gen_cost1_sch = gen_cost1_sch[self.start_datetime:self.end_datetime].to_numpy()
+
+        # Slice the generator profile to the simulation period
+        gen_cost0_sch = gen_cost0_sch[self.start_datetime:self.end_datetime].to_numpy()
+        gen_cost1_sch = gen_cost1_sch[self.start_datetime:self.end_datetime].to_numpy()
+
+        # Linear cost intercept coefficients in p.u.
+        if gen_cost0_sch is not None and gen_cost0_sch.size > 0:
+            # Thermal generators: Use user-defined time series schedule
+            self.gencost_0 = np.empty((self.NT, self.NG))
+            self.gencost_0[:, self.gen_idx_non_dc] = gen_cost0_sch
+            # HVDC Proxy generators: Use default values from the PyPower case
+            self.gencost_0[:, self.dc_idx_f] = np.ones(
+                (self.NT, self.num_dcline)) * self.gencost[self.dc_idx_f, COST + 1]
+            self.gencost_0[:, self.dc_idx_t] = np.ones(
+                (self.NT, self.num_dcline)) * self.gencost[self.dc_idx_t, COST + 1]
+        else:
+            raise ValueError('No generation cost profile is provided.')
+
+        # Linear cost slope coefficients in p.u.
+        if gen_cost1_sch is not None and gen_cost1_sch.size > 0:
+            # Thermal generators: Use user-defined time series schedule
+            self.gencost_1 = np.empty((self.NT, self.NG))
+            self.gencost_1[:, self.gen_idx_non_dc] = gen_cost1_sch * self.baseMVA
+            # HVDC Proxy generators: Use default values from the PyPower case
+            self.gencost_1[:, self.dc_idx_f] = np.ones(
+                (self.NT, self.num_dcline)) * self.gencost[self.dc_idx_f, COST] * self.baseMVA
+            self.gencost_1[:, self.dc_idx_t] = np.ones(
+                (self.NT, self.num_dcline)) * self.gencost[self.dc_idx_t, COST] * self.baseMVA
+        else:
+            raise ValueError('No generation cost profile is provided.')
 
     def get_gen_init_data(self, gen_init):
         """
@@ -751,15 +828,14 @@ class NYGrid:
         -------
             Parameters of the network and constraints.
         """
-        # Constant data
+
+        # %% Constant data
         # Remove user functions
         del self.ppc['userfcn']
 
         # Format genfuel and bus_name strings
-        self.ppc['genfuel'] = np.array(
-            [str(x[0][0]) for x in self.ppc['genfuel']])
-        self.ppc['bus_name'] = np.array(
-            [str(x[0][0]) for x in self.ppc['bus_name']])
+        self.ppc['genfuel'] = np.array([str(x[0][0]) for x in self.ppc['genfuel']])
+        self.ppc['bus_name'] = np.array([str(x[0][0]) for x in self.ppc['bus_name']])
 
         # Format interface limit data
         self.ppc['if'] = {
@@ -772,7 +848,7 @@ class NYGrid:
         self.ppc['baseMVA'] = float(self.ppc['baseMVA'])
 
         # Convert DC line to generators and add to gen matrix
-        self.ppc_dc, self.num_dcline = self.convert_dcline_2_gen()
+        self.ppc_dc, self.num_dcline = convert_dcline_2_gen(self.ppc)
 
         # Convert to internal indexing
         self.ppc_int = pp.ext2int(self.ppc_dc)
@@ -828,172 +904,100 @@ class NYGrid:
             self.if_map[:, 1]).astype(int)
         self.if_map[:, 1] = br_dir * (br_idx - 1)
 
-        # User defined data
+        # %% User defined data
         # Historical generation data
         if self.gen_mw_sch is not None:
+            # Thermal generators: Use user-defined time series schedule
             self.gen_hist = np.empty((self.NT, self.NG))
-            self.gen_hist[:,
-            self.gen_idx_non_dc] = self.gen_mw_sch / self.baseMVA
+            self.gen_hist[:, self.gen_idx_non_dc] = self.gen_mw_sch / self.baseMVA
+            # HVDC Proxy generators: Use default values from the PyPower case
             self.gen_hist[:, self.dc_idx_f] = np.ones(
                 (self.NT, self.num_dcline)) * self.gen[self.dc_idx_f, PG] / self.baseMVA
             self.gen_hist[:, self.dc_idx_t] = np.ones(
                 (self.NT, self.num_dcline)) * self.gen[self.dc_idx_t, PG] / self.baseMVA
         else:
+            # Use zero as default values
             self.gen_hist = np.zeros((self.NT, self.NG))
 
         # Generator upper operating limit in p.u.
         if self.gen_max_sch is not None:
+            # Thermal generators: Use user-defined time series schedule
             self.gen_max = np.empty((self.NT, self.NG))
             self.gen_max[:, self.gen_idx_non_dc] = self.gen_max_sch / self.baseMVA
+            # HVDC Proxy generators: Use default values from the PyPower case
             self.gen_max[:, self.dc_idx_f] = np.ones(
                 (self.NT, self.num_dcline)) * self.gen[self.dc_idx_f, PMAX] / self.baseMVA
             self.gen_max[:, self.dc_idx_t] = np.ones(
                 (self.NT, self.num_dcline)) * self.gen[self.dc_idx_t, PMAX] / self.baseMVA
         else:
-            self.gen_max = np.ones((self.NT, self.NG)) * \
-                           self.gen[:, PMAX] / self.baseMVA
+            # Use default values from the PyPower case
+            self.gen_max = np.ones((self.NT, self.NG)) * self.gen[:, PMAX] / self.baseMVA
 
         # Generator lower operating limit in p.u.
         if self.gen_min_sch is not None:
+            # Thermal generators: Use user-defined time series schedule
             self.gen_min = np.empty((self.NT, self.NG))
             self.gen_min[:, self.gen_idx_non_dc] = self.gen_min_sch / self.baseMVA
+            # HVDC Proxy generators: Use default values from the PyPower case
             self.gen_min[:, self.dc_idx_f] = np.ones(
                 (self.NT, self.num_dcline)) * self.gen[self.dc_idx_f, PMIN] / self.baseMVA
             self.gen_min[:, self.dc_idx_t] = np.ones(
                 (self.NT, self.num_dcline)) * self.gen[self.dc_idx_t, PMIN] / self.baseMVA
         else:
-            self.gen_min = np.ones((self.NT, self.NG)) * \
-                           self.gen[:, PMIN] / self.baseMVA
+            # Use default values from the PyPower case
+            self.gen_min = np.ones((self.NT, self.NG)) * self.gen[:, PMIN] / self.baseMVA
 
-        # Generator ramp rate limit in p.u.
+        # Generator ramp rate limit in p.u./hour
         if self.gen_ramp_sch is not None:
+            # Thermal generators: Use user-defined time series schedule
             self.ramp_up = np.empty((self.NT, self.NG))
             self.ramp_up[:, self.gen_idx_non_dc] = self.gen_ramp_sch / self.baseMVA
+            # HVDC Proxy generators: Use default values from the PyPower case
             self.ramp_up[:, self.dc_idx_f] = np.ones(
                 (self.NT, self.num_dcline)) * self.gen[self.dc_idx_f, RAMP_30] * 2 / self.baseMVA
             self.ramp_up[:, self.dc_idx_t] = np.ones(
                 (self.NT, self.num_dcline)) * self.gen[self.dc_idx_t, RAMP_30] * 2 / self.baseMVA
-
-            self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
         else:
-            self.ramp_up = np.ones((self.NT, self.NG)) * \
-                           self.gen[:, RAMP_30] * 2 / self.baseMVA
-            self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
+            # Use default values from the PyPower case
+            self.ramp_up = np.ones((self.NT, self.NG)) * self.gen[:, RAMP_30] * 2 / self.baseMVA
+
+        # Downward ramp rate is the minimum of the upward ramp rate and the maximum generation limit
+        self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
 
         # Linear cost intercept coefficients in p.u.
         if self.gen_cost0_sch is not None:
+            # Thermal generators: Use user-defined time series schedule
             self.gencost_0 = np.empty((self.NT, self.NG))
             self.gencost_0[:, self.gen_idx_non_dc] = self.gen_cost0_sch
+            # HVDC Proxy generators: Use default values from the PyPower case
             self.gencost_0[:, self.dc_idx_f] = np.ones(
                 (self.NT, self.num_dcline)) * self.gencost[self.dc_idx_f, COST + 1]
             self.gencost_0[:, self.dc_idx_t] = np.ones(
                 (self.NT, self.num_dcline)) * self.gencost[self.dc_idx_t, COST + 1]
-
         else:
-            self.gencost_0 = np.ones(
-                (self.NT, self.NG)) * self.gencost[:, COST + 1]
+            # Use default values from the PyPower case
+            self.gencost_0 = np.ones((self.NT, self.NG)) * self.gencost[:, COST + 1]
 
         # Linear cost slope coefficients in p.u.
         if self.gen_cost1_sch is not None:
+            # Thermal generators: Use user-defined time series schedule
             self.gencost_1 = np.empty((self.NT, self.NG))
-            self.gencost_1[:,
-            self.gen_idx_non_dc] = self.gen_cost1_sch * self.baseMVA
+            self.gencost_1[:, self.gen_idx_non_dc] = self.gen_cost1_sch * self.baseMVA
+            # HVDC Proxy generators: Use default values from the PyPower case
             self.gencost_1[:, self.dc_idx_f] = np.ones(
                 (self.NT, self.num_dcline)) * self.gencost[self.dc_idx_f, COST] * self.baseMVA
             self.gencost_1[:, self.dc_idx_t] = np.ones(
                 (self.NT, self.num_dcline)) * self.gencost[self.dc_idx_t, COST] * self.baseMVA
         else:
-            self.gencost_1 = np.ones(
-                (self.NT, self.NG)) * self.gencost[:, COST] * self.baseMVA
+            # Use default values from the PyPower case
+            self.gencost_1 = np.ones((self.NT, self.NG)) * self.gencost[:, COST] * self.baseMVA
 
         # Convert load to p.u.
         if self.load_sch is not None:
             self.load_pu = self.load_sch / self.baseMVA
         else:
-            self.load_pu = np.ones((self.NT, self.NL)) * \
-                           self.bus[:, PD] / self.baseMVA
+            self.load_pu = np.ones((self.NT, self.NL)) * self.bus[:, PD] / self.baseMVA
             Warning("No load profile is provided. Using default load profile.")
-
-    def convert_dcline_2_gen(self):
-        """
-        Convert DC lines to generators and add their parameters in the PyPower matrices.
-
-        Parameters:
-            ppc (dict): PyPower case dictionary.
-
-        Returns:
-            ppc (dict): updated PyPower case dictionary.
-            num_dcline (float): number of DC lines.
-        """
-
-        # Define dcline matrix indices
-        DC_F_BUS = 0
-        DC_T_BUS = 1
-        DC_BR_STATUS = 2
-        DC_PF = 3
-        DC_PT = 4
-        DC_QF = 5
-        DC_QT = 6
-        DC_VF = 7
-        DC_VT = 8
-        DC_PMIN = 9
-        DC_PMAX = 10
-        DC_QMINF = 11
-        DC_QMAXF = 12
-        DC_QMINT = 13
-        DC_QMAXT = 14
-
-        # Get PyPower case information
-        ppc_dc = self.ppc
-        baseMVA = ppc_dc['baseMVA']
-        gen = ppc_dc['gen']
-        gencost = ppc_dc['gencost']
-        dcline = ppc_dc['dcline']
-        genfuel = ppc_dc['genfuel']
-
-        # Set gen parameters of the DC line converted generators
-        num_dcline = dcline.shape[0]
-        dcline_gen = np.zeros((num_dcline * 2, 21))
-        dcline_gen[:, GEN_BUS] = np.concatenate([dcline[:, DC_F_BUS],
-                                                 dcline[:, DC_T_BUS]])
-        dcline_gen[:, PG] = np.concatenate([-dcline[:, DC_PF],
-                                            dcline[:, DC_PF]])
-        dcline_gen[:, QG] = np.concatenate([-dcline[:, DC_QF],
-                                            dcline[:, DC_QF]])
-        dcline_gen[:, QMAX] = np.concatenate([dcline[:, DC_QMAXF],
-                                              dcline[:, DC_QMAXT]])
-        dcline_gen[:, QMIN] = np.concatenate([dcline[:, DC_QMINF],
-                                              dcline[:, DC_QMINT]])
-        dcline_gen[:, VG] = np.concatenate([dcline[:, DC_VF],
-                                            dcline[:, DC_VT]])
-        dcline_gen[:, MBASE] = np.ones(num_dcline * 2) * baseMVA
-        dcline_gen[:, GEN_STATUS] = np.concatenate([dcline[:, DC_BR_STATUS],
-                                                    dcline[:, DC_BR_STATUS]])
-        dcline_gen[:, PMAX] = np.concatenate([dcline[:, DC_PMAX],
-                                              dcline[:, DC_PMAX]])
-        dcline_gen[:, PMIN] = np.concatenate([dcline[:, DC_PMIN],
-                                              dcline[:, DC_PMIN]])
-        dcline_gen[:, RAMP_AGC] = np.ones(
-            num_dcline * 2) * 1e10  # Unlimited ramp rate
-        dcline_gen[:, RAMP_10] = np.ones(
-            num_dcline * 2) * 1e10  # Unlimited ramp rate
-        dcline_gen[:, RAMP_30] = np.ones(
-            num_dcline * 2) * 1e10  # Unlimited ramp rate
-        # Add the DC line converted generators to the gen matrix
-        ppc_dc['gen'] = np.concatenate([gen, dcline_gen])
-
-        # Set gencost parameters of the DC line converted generators
-        dcline_gencost = np.zeros((num_dcline * 2, 6))
-        dcline_gencost[:, MODEL] = np.ones(num_dcline * 2) * POLYNOMIAL
-        dcline_gencost[:, NCOST] = np.ones(num_dcline * 2) * 2
-        # Add the DC line converted generators to the gencost matrix
-        ppc_dc['gencost'] = np.concatenate([gencost, dcline_gencost])
-
-        # Add the DC line converted generators to the genfuel list
-        dcline_genfuel = ['dc line'] * num_dcline * 2
-        ppc_dc['genfuel'] = np.concatenate([genfuel, dcline_genfuel])
-
-        return ppc_dc, num_dcline
 
     def check_input_dim(self):
         # Check dimensions of the input data
@@ -1002,7 +1006,7 @@ class NYGrid:
             raise ValueError(
                 'Found mismatch in generator constraint dimensions!')
 
-        if (self.br_min.shape != self.br_max.shape):
+        if self.br_min.shape != self.br_max.shape:
             raise ValueError(
                 'Found mismatch in branch flow limit array dimensions!')
 

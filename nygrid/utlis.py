@@ -9,15 +9,20 @@ import os
 import pandas as pd
 import string
 
+
 def format_date(in_date):
     """
     Formats an input date so that it can be correctly written to the namelist.
 
     Parameters
     ----------
-    :param in_date : string
-        string specifying the date
-    :return: datetime64 array specifying the date
+    in_date : str
+        Date to be formatted.
+
+    Returns
+    -------
+    out_date : str
+        Formatted date.
     """
     for fmt in ('%b %d %Y', '%B %d %Y', '%b %d, %Y', '%B %d, %Y',
                 '%m-%d-%Y', '%m.%d.%Y', '%m/%d/%Y',
@@ -29,5 +34,3 @@ def format_date(in_date):
         except ValueError:
             pass
     raise ValueError('No valid date format found; please use a common US format (e.g., Jan 01, 2011 00)')
-
-

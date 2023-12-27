@@ -203,12 +203,12 @@ for d in range(len(timestamp_list)-1):
                         verbose=True)
 
     # Read grid data
-    nygrid_sim.get_load_data(load_profile_renewable)
-    nygrid_sim.get_gen_data(gen_profile)
-    nygrid_sim.get_genmax_data(genmax_profile)
-    nygrid_sim.get_genmin_data(genmin_profile)
-    nygrid_sim.get_genramp_data(genramp30_profile)
-    nygrid_sim.get_gencost_data(gencost0_profile, gencost1_profile)
+    nygrid_sim.ts_set_load_sch(load_profile_renewable)
+    nygrid_sim.ts_set_gen_mw_sch(gen_profile)
+    nygrid_sim.ts_set_gen_max_sch(genmax_profile)
+    nygrid_sim.ts_set_gen_min_sch(genmin_profile)
+    nygrid_sim.ts_set_gen_ramp_sch(genramp30_profile)
+    nygrid_sim.ts_set_gen_cost_sch(gencost0_profile, gencost1_profile)
 
     # Process ppc
     nygrid_sim.process_ppc()
@@ -232,7 +232,7 @@ for d in range(len(timestamp_list)-1):
     solver = SolverFactory('gurobi')
     results_multi_opf = solver.solve(model_multi_opf, tee=True)
 
-    if nygrid_sim.check_status(results_multi_opf):
+    if check_status(results_multi_opf):
         print(f'Objective: {model_multi_opf.obj():.4e}')
 
         # %% Process results

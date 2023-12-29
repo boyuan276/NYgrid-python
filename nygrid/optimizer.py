@@ -26,36 +26,7 @@ class Optimizer:
         else:
             self.model = nygrid.model
 
-        # User-defined initial condition
-        # TODO: Add initial condition for ES module
-
-        # Penalty parameters and default values
-        # ED module
-        self.NoPowerBalanceViolation = False
-        self.NoRampViolation = False
-        self.PenaltyForOverGeneration = 1_500  # $/MWh
-        self.PenaltyForLoadShed = 5_000  # $/MWh
-        self.PenaltyForRampViolation = 11_000  # $/MW
-        # UC module
-        self.PenaltyForMinTimeViolation = 1_000  # $/MWh
-        self.PenaltyForNumberCommitViolation = 10_000  # $/hour
-        # RS module
-        self.NoReserveViolation = False
-        self.PenaltyForReserveViolation = 1_300  # $/MW
-        self.NoImplicitReserveCascading = False
-        self.OfflineReserveNotFromOnline = False
-        # PF module
-        self.NoPowerflowViolation = False
-        self.SlackBusName = None
-        self.SystemBaseMVA = 100  # MVA
-        self.HvdcHurdleCost = 0.10  # $/MWh
-        self.PenaltyForBranchMwViolation = 1e21  # $/MWh
-        self.PenaltyForInterfaceMWViolation = 1e21  # $/MWh
-        self.MaxPhaseAngleDifference = 1.5  # Radians
-        # ES module
-        self.PenaltyForEnergyStorageViolation = 8_000  # $/MWh
-
-        # %% Define sets
+        # Define sets
         self.times = range(self.nygrid.NT)
         self.buses = range(self.nygrid.NB)
         self.branches = range(self.nygrid.NBR)
@@ -77,7 +48,9 @@ class Optimizer:
         self.model.PG = pyo.Var(self.times, self.generators,
                                 within=pyo.Reals, initialize=1)
 
-        logging.debug('Added variables for ED module.')
+        # Load real power consumption
+        self.model.PL = pyo.Var(self.times, self.loads,
+                                within=pyo.Reals, initialize=1)
 
         # Slack variable for ramp rate downward limit
         self.model.s_ramp_down = pyo.Var(self.times, self.generators,
@@ -86,6 +59,16 @@ class Optimizer:
         # Slack variable for ramp rate upward limit
         self.model.s_ramp_up = pyo.Var(self.times, self.generators,
                                        within=pyo.NonNegativeReals, initialize=0)
+
+        # Slack variable for over generation
+        self.model.s_over_gen = pyo.Var(self.times,
+                                        within=pyo.NonNegativeReals, initialize=0)
+
+        # Slack variable for load shed
+        self.model.s_load_shed = pyo.Var(self.times,
+                                         within=pyo.NonNegativeReals, initialize=0)
+
+        logging.debug('Added variables for ED module.')
 
     def add_vars_pf(self):
         """
@@ -96,10 +79,16 @@ class Optimizer:
         None
         """
 
-        # Bus phase angle
-        self.model.VA = pyo.Var(self.times, self.buses,
-                                within=pyo.Reals, initialize=0,
-                                bounds=(-2 * np.pi, 2 * np.pi))
+        if not self.nygrid.UsePTDF:
+            # Bus phase angle to calculate DC power flow
+            self.model.VA = pyo.Var(self.times, self.buses,
+                                    within=pyo.Reals, initialize=0, bounds=(-2 * np.pi, 2 * np.pi))
+        else:
+            # Otherwise, use linearized DC power flow using PTDF
+            # Power injection at each bus
+            self.model.PBUS = pyo.Var(self.times, self.buses,
+                                      within=pyo.Reals, initialize=0)
+
         # Branch power flow
         self.model.PF = pyo.Var(self.times, self.branches,
                                 within=pyo.Reals, initialize=0)
@@ -107,12 +96,15 @@ class Optimizer:
         # Slack variable for interface flow upper bound
         self.model.s_if_max = pyo.Var(self.times, self.interfaces,
                                       within=pyo.NonNegativeReals, initialize=0)
+
         # Slack variable for interface flow lower bound
         self.model.s_if_min = pyo.Var(self.times, self.interfaces,
                                       within=pyo.NonNegativeReals, initialize=0)
+
         # Slack variable for branch flow upper bound
         self.model.s_br_max = pyo.Var(self.times, self.branches,
                                       within=pyo.NonNegativeReals, initialize=0)
+
         # Slack variable for branch flow lower bound
         self.model.s_br_min = pyo.Var(self.times, self.branches,
                                       within=pyo.NonNegativeReals, initialize=0)
@@ -164,31 +156,45 @@ class Optimizer:
             return sum(self.nygrid.gencost_0[t, g] + self.nygrid.gencost_1[t, g] * model.PG[t, g]
                        for g in self.generators for t in self.times)
 
+        def over_gen_penalty_expr(model):
+            return sum(model.s_over_gen[t] for t in self.times) * self.nygrid.PenaltyForOverGeneration
+
+        def load_shed_penalty_expr(model):
+            return sum(model.s_load_shed[t] for t in self.times) * self.nygrid.PenaltyForLoadShed
+
         # Penalty for violating ramp down limits
         def ramp_down_penalty_expr(model):
             return sum(model.s_ramp_down[t, g]
-                       for g in self.generators for t in self.times) * self.PenaltyForRampViolation
+                       for g in self.generators for t in self.times) * self.nygrid.PenaltyForRampViolation
 
         # Penalty for violating ramp up limits
         def ramp_up_penalty_expr(model):
             return sum(model.s_ramp_up[t, g]
-                       for g in self.generators for t in self.times) * self.PenaltyForRampViolation
+                       for g in self.generators for t in self.times) * self.nygrid.PenaltyForRampViolation
 
         # Penalty for violating interface flow limits
-        def if_penalty_expr(model):
-            return sum(model.s_if_max[t, n] + model.s_if_min[t, n]
-                       for n in self.interfaces for t in self.times) * self.PenaltyForInterfaceMWViolation
+        def if_max_penalty_expr(model):
+            return sum(model.s_if_max[t, n]
+                       for n in self.interfaces for t in self.times) * self.nygrid.PenaltyForInterfaceMWViolation
+
+        def if_min_penalty_expr(model):
+            return sum(model.s_if_min[t, n]
+                       for n in self.interfaces for t in self.times) * self.nygrid.PenaltyForInterfaceMWViolation
 
         # Penalty for violating branch flow limits
-        def br_penalty_expr(model):
-            return sum(model.s_br_max[t, n] + model.s_br_min[t, n]
-                       for n in self.branches for t in self.times) * self.PenaltyForBranchMwViolation
+        def br_max_penalty_expr(model):
+            return sum(model.s_br_max[t, n]
+                       for n in self.branches for t in self.times) * self.nygrid.PenaltyForBranchMwViolation
+
+        def br_min_penalty_expr(model):
+            return sum(model.s_br_min[t, n]
+                       for n in self.branches for t in self.times) * self.nygrid.PenaltyForBranchMwViolation
 
         self.model.obj = pyo.Objective(expr=(gen_cost_ene_expr(self.model)
-                                             + ramp_down_penalty_expr(self.model)
-                                             + ramp_up_penalty_expr(self.model)
-                                             + if_penalty_expr(self.model)
-                                             + br_penalty_expr(self.model)),
+                                             + over_gen_penalty_expr(self.model) + load_shed_penalty_expr(self.model)
+                                             + ramp_down_penalty_expr(self.model) + ramp_up_penalty_expr(self.model)
+                                             + if_max_penalty_expr(self.model) + if_min_penalty_expr(self.model)
+                                             + br_max_penalty_expr(self.model)) + br_min_penalty_expr(self.model),
                                        sense=pyo.minimize)
 
         logging.debug('Added objective function.')
@@ -253,6 +259,13 @@ class Optimizer:
 
         logging.debug('Added constraints for ED module.')
 
+        # 4.1. Load real power setpoint
+        def load_power_rule(model, t, ld):
+            return model.PL[t, ld] == self.nygrid.load_pu[t, ld]
+
+        self.model.c_load_set = pyo.Constraint(self.times, self.loads,
+                                               rule=load_power_rule)
+
     def add_constrs_pf(self):
         """
         Add constraints for PF module.
@@ -262,36 +275,62 @@ class Optimizer:
         None
         """
 
-        # 1.1. Branch flow definition
-        def branch_flow_rule(model, t, br):
-            return model.PF[t, br] == sum(self.nygrid.Bf[br, b] * model.VA[t, b]
-                                          for b in self.buses)
+        if not self.nygrid.UsePTDF:
+            # 1.1. DC power flow constraint
+            def dc_power_flow_rule(model, t, b):
+                return sum(self.nygrid.gen_map[b, g] * model.PG[t, g] for g in self.generators) \
+                    - sum(self.nygrid.load_map[b, ld] * self.model.PL[t, ld] for ld in self.loads) \
+                    == sum(self.nygrid.B[b, b_] * model.VA[t, b_] for b_ in self.buses)
 
-        self.model.c_br_flow = pyo.Constraint(self.times, self.branches,
-                                              rule=branch_flow_rule)
+            self.model.c_pf = pyo.Constraint(self.times, self.buses,
+                                             rule=dc_power_flow_rule)
 
-        # 1.2. Branch flow upper limit
+            # 1.2. Branch flow definition
+            def branch_flow_rule(model, t, br):
+                return model.PF[t, br] == sum(self.nygrid.Bf[br, b] * model.VA[t, b]
+                                              for b in self.buses)
+
+            self.model.c_br_flow = pyo.Constraint(self.times, self.branches,
+                                                  rule=branch_flow_rule)
+
+        else:
+            # 1.3. System-wide energy balance constraint
+            def energy_balance_rule(model, t):
+                return sum(model.PG[t, g] for g in self.generators) - model.s_over_gen[t] + model.s_load_shed[t] \
+                    == sum(self.model.PL[t, ld] for ld in self.loads)
+
+            self.model.c_energy_balance = pyo.Constraint(self.times,
+                                                         rule=energy_balance_rule)
+
+            # 1.4. Power injection at each bus
+            def bus_power_inj_rule(model, t, b):
+                return model.PBUS[t, b] == (sum(self.nygrid.gen_map[b, g] * model.PG[t, g] for g in self.generators)
+                                            - sum(self.nygrid.load_map[b, ld] * self.model.PL[t, ld]
+                                                  for ld in self.loads))
+
+            self.model.c_bus_power_inj = pyo.Constraint(self.times, self.buses,
+                                                        rule=bus_power_inj_rule)
+
+            # 1.4. Linearized DC power flow using PTDF
+            def dc_power_flow_ptdf_rule(model, t, br):
+                return model.PF[t, br] == sum(self.nygrid.PTDF[br, b] * model.PBUS[t, b] for b in self.buses)
+
+            self.model.c_pf_ptdf = pyo.Constraint(self.times, self.branches,
+                                                  rule=dc_power_flow_ptdf_rule)
+
+        # 2.2. Branch flow upper limit
         def branch_flow_max_rule(model, t, br):
             return model.PF[t, br] <= self.nygrid.br_max[br] + model.s_br_max[t, br]
 
         self.model.c_br_max = pyo.Constraint(self.times, self.branches,
                                              rule=branch_flow_max_rule)
 
-        # 1.3. Branch flow lower limit
+        # 2.3. Branch flow lower limit
         def branch_flow_min_rule(model, t, br):
             return - model.PF[t, br] <= - self.nygrid.br_min[br] + model.s_br_min[t, br]
 
         self.model.c_br_min = pyo.Constraint(self.times, self.branches,
                                              rule=branch_flow_min_rule)
-
-        # 2.1. DC power flow constraint
-        def dc_power_flow_rule(model, t, b):
-            return sum(self.nygrid.gen_map[b, g] * model.PG[t, g] for g in self.generators) \
-                - sum(self.nygrid.load_map[b, ld] * self.nygrid.load_pu[t, ld] for ld in self.loads) \
-                == sum(self.nygrid.B[b, b_] * model.VA[t, b_] for b_ in self.buses)
-
-        self.model.c_pf = pyo.Constraint(self.times, self.buses,
-                                         rule=dc_power_flow_rule)
 
         # 3.1. Interface flow upper limit
         def interface_flow_max_rule(model, t, n):

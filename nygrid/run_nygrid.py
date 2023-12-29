@@ -219,10 +219,13 @@ class NYGrid:
         # Generator info
         self.gen_bus = self.gen[:, GEN_BUS].astype(int)  # what buses are they at?
 
-        # build B matrices and phase shift injections
+        # Build B matrices and phase shift injections
         B, Bf, _, _ = pp.makeBdc(self.baseMVA, self.bus, self.branch)
         self.B = B.todense()
         self.Bf = Bf.todense()
+
+        # Linear shift factor
+        self.PTDF = pp.makePTDF(self.baseMVA, self.bus, self.branch)
 
         # Problem dimensions
         self.NG = self.gen.shape[0]  # Number of generators
@@ -300,13 +303,42 @@ class NYGrid:
         # Generator initial condition
         self.gen_init = None
 
-        # Create Pyomo model
-        self.model = pyo.ConcreteModel(name='multi-period DC OPF')
+        # %% Create Pyomo model
+        self.model = None
 
-    def set_penalty_params(self, penalty_params):
+        # %% Penalty parameters and default values
+        # ED module
+        self.NoPowerBalanceViolation = False
+        self.NoRampViolation = False
+        self.PenaltyForOverGeneration = 1_500  # $/MWh
+        self.PenaltyForLoadShed = 5_000  # $/MWh
+        self.PenaltyForRampViolation = 11_000  # $/MW
+        # UC module
+        self.PenaltyForMinTimeViolation = 1_000  # $/MWh, Not used
+        self.PenaltyForNumberCommitViolation = 10_000  # $/hour, Not used
+        # RS module
+        self.NoReserveViolation = False
+        self.PenaltyForReserveViolation = 1_300  # $/MW, Not used
+        self.NoImplicitReserveCascading = False
+        self.OfflineReserveNotFromOnline = False
+        # PF module
+        self.NoPowerflowViolation = False
+        self.HvdcHurdleCost = 0.10  # $/MWh, Not used
+        self.PenaltyForBranchMwViolation = 1_000  # $/MWh
+        self.PenaltyForInterfaceMWViolation = 1_000  # $/MWh
+        self.MaxPhaseAngleDifference = 1.5  # Radians, Not used
+        # ES module
+        self.PenaltyForEnergyStorageViolation = 8_000  # $/MWh, Not used
+
+        # Model options
+        # Use Power Transfer Distribution Factors (PTDF) for linear shift factor
+        self.UsePTDF = True
+        self.solver = 'gurobi'
+
+    def set_options(self, options):
 
         # TODO: Check if this is the right way to set the penalty parameters
-        for key, value in penalty_params.items():
+        for key, value in options.items():
             setattr(self, key, value)
             logging.info(f'Set {key} to {value} ...')
 
@@ -564,7 +596,10 @@ class NYGrid:
 
         self.model = optimizer.model
 
-    def solve_dc_opf(self, solver='gurobi', solver_options=None):
+    def solve_dc_opf(self, solver_options=None):
+
+        # Create Pyomo model
+        self.model = pyo.ConcreteModel(name='multi-period DC OPF')
 
         # Check input dimensions
         self.check_input_dim()
@@ -577,7 +612,7 @@ class NYGrid:
             self.show_model_dim()
 
         # Solve the optimization problem
-        opt = pyo.SolverFactory(solver)
+        opt = pyo.SolverFactory(self.solver)
         if solver_options is not None:
             opt.options.update(solver_options)
         results = opt.solve(self.model, tee=self.verbose)
@@ -585,67 +620,6 @@ class NYGrid:
         # Check the status of the optimization problem
         if check_status(results):
             print(f"Objective function value: {self.model.obj():.3e}")
-
-    def get_results_single_opf(self, model_single_opf):
-        """
-        Get results for a single-period OPF problem.
-
-        Parameters:
-            model_single_opf (Pyomo model): Pyomo model of single-period OPF problem.
-
-        Returns:
-            results (dict): a dict of pandas Series, including:
-                1. Generator power generation.
-                2. Bus phase angle.
-                3. Branch power flow.
-                4. Interface flow.
-                5. Bus locational marginal price (LMP).
-        """
-        # Power generation
-        results_pg = np.array(model_single_opf.PG[:]()) * self.baseMVA
-        gen_order = self.ppc_int['order']['gen']['e2i']
-        results_pg = pd.Series(results_pg, index=gen_order).sort_index()
-
-        # Bus phase angle
-        results_va = np.array(model_single_opf.VA[:]()) * 180 / np.pi
-        # Just to compare with PyPower
-        results_va = results_va - 73.4282
-        # Convert negative numbers to 0-360
-        results_va = np.where(results_va < 0, results_va + 360, results_va)
-        results_va = pd.Series(results_va)
-
-        # Branch power flow
-        branch_pf = np.array(model_single_opf.PF[:]()) * self.baseMVA
-        results_pf = pd.Series(branch_pf)
-
-        # Interface flow
-        if_flow = np.zeros(len(self.if_lims))
-        for n in range(len(self.if_lims)):
-            if_id = self.if_lims[n, 0]
-            br_dir_idx = self.if_map[(self.if_map[:, 0] == int(if_id)), 1]
-            br_dir, br_idx = np.sign(br_dir_idx), np.abs(
-                br_dir_idx).astype(int)
-            if_flow[n] = sum(br_dir[i] * branch_pf[br_idx[i] - 1]
-                             for i in range(len(br_idx)))
-            if_flow[n] = sum(br_dir[i] * branch_pf[br_idx[i] - 1]
-                             for i in range(len(br_idx)))
-        results_if = pd.Series(if_flow)
-
-        bus_lmp = np.zeros(self.NB)
-        for i in range(self.NB):
-            bus_lmp[i] = np.abs(
-                model_single_opf.dual[model_single_opf.c_pf[i + 1]]) / self.baseMVA
-        results_lmp = pd.Series(bus_lmp)
-
-        results_single_opf = {
-            'PG': results_pg,
-            'VA': results_va,
-            'PF': results_pf,
-            'IF': results_if,
-            'LMP': results_lmp
-        }
-
-        return results_single_opf
 
     def get_results_dc_opf(self):
         """
@@ -661,23 +635,20 @@ class NYGrid:
                 6. Total cost.
         """
 
+        # Create dictionary to store results
+        vars = dict()
+
         # Power generation
         results_pg = np.array(self.model.PG[:, :]()).reshape(self.NT, self.NG) * self.baseMVA
         gen_order = self.ppc_int['order']['gen']['e2i']
         results_pg = pd.DataFrame(results_pg, index=self.timestamp_list,
                                   columns=gen_order).sort_index(axis=1)
-
-        # Bus phase angle
-        results_va = np.array(self.model.VA[:, :]()).reshape(self.NT, self.NB) * 180 / np.pi
-        # Just to compare with PyPower
-        results_va = results_va - 73.4282
-        # Convert negative numbers to 0-360
-        results_va = np.where(results_va < 0, results_va + 360, results_va)
-        results_va = pd.DataFrame(results_va, index=self.timestamp_list)
+        vars['PG'] = results_pg
 
         # Branch power flow
         branch_pf = np.array(self.model.PF[:, :]()).reshape(self.NT, self.NBR) * self.baseMVA
         results_pf = pd.DataFrame(branch_pf, index=self.timestamp_list)
+        vars['PF'] = results_pf
 
         # Interface flow
         if_flow = np.zeros((self.NT, self.NIF))
@@ -690,29 +661,111 @@ class NYGrid:
                 if_flow[t, n] = sum(br_dir[i] * branch_pf[t, br_idx[i] - 1]
                                     for i in range(len(br_idx)))
         results_if = pd.DataFrame(if_flow, index=self.timestamp_list)
+        vars['IF'] = results_if
 
-        # Bus locational marginal price (LMP)
-        results_lmp = np.zeros((self.NT, self.NB))
-        for t in range(self.NT):
-            for n in range(self.NB):
-                results_lmp[t, n] = np.abs(self.model.dual[self.model.c_pf[t, n]]) / self.baseMVA
-        results_lmp = pd.DataFrame(results_lmp, index=self.timestamp_list)
+        if not self.UsePTDF:
+            # Bus phase angle
+            results_va = np.array(self.model.VA[:, :]()).reshape(self.NT, self.NB) * 180 / np.pi
+            # Just to compare with PyPower
+            results_va = results_va - 73.4282
+            # Convert negative numbers to 0-360
+            results_va = np.where(results_va < 0, results_va + 360, results_va)
+            results_va = pd.DataFrame(results_va, index=self.timestamp_list)
+            vars['VA'] = results_va
+
+            # Bus locational marginal price (LMP)
+            results_lmp = np.zeros((self.NT, self.NB))
+            for t in range(self.NT):
+                for n in range(self.NB):
+                    results_lmp[t, n] = np.abs(self.model.dual[self.model.c_pf[t, n]]) / self.baseMVA
+            results_lmp = pd.DataFrame(results_lmp, index=self.timestamp_list)
+            vars['LMP'] = results_lmp
+
+        else:
+            # Bus power injection
+            results_pbus = np.array(self.model.PBUS[:, :]()).reshape(self.NT, self.NB) * self.baseMVA
+            results_pbus = pd.DataFrame(results_pbus, index=self.timestamp_list)
+            vars['PBUS'] = results_pbus
+
+            # Bus locational marginal price (LMP)
+            results_lmp = np.zeros((self.NT, self.NB))
+            for t in range(self.NT):
+                for n in range(self.NL):
+                    results_lmp[t, n] = np.abs(self.model.dual[self.model.c_load_set[t, n]]) / self.baseMVA
+            # sp_energy = np.zeros(self.NT)  # Shadow price of energy
+            # sp_congestion_max = np.zeros((self.NT, self.NB))  # Shadow price of congestion max
+            # sp_congestion_min = np.zeros((self.NT, self.NB))  # Shadow price of congestion min
+            # for t in range(self.NT):
+            #     sp_energy[t] = np.abs(self.model.dual[self.model.c_energy_balance[t]]) / self.baseMVA
+            #     for n in range(self.NB):
+            #         sp_congestion_max[t, n] = np.abs(self.model.dual[self.model.c_br_max[t, n]]) / self.baseMVA
+            #         sp_congestion_min[t, n] = np.abs(self.model.dual[self.model.c_br_min[t, n]]) / self.baseMVA
+            #         results_lmp[t, n] = sp_energy[t] + sp_congestion_max[t, n] + sp_congestion_min[t, n]
+            results_lmp = pd.DataFrame(results_lmp, index=self.timestamp_list)
+            vars['LMP'] = results_lmp
+
+        # Slack variables
+        results_s_ramp_down = np.array(self.model.s_ramp_down[:, :]()).reshape(self.NT, self.NG) * self.baseMVA
+        results_s_ramp_up = np.array(self.model.s_ramp_up[:, :]()).reshape(self.NT, self.NG) * self.baseMVA
+        results_s_over_gen = np.array(self.model.s_over_gen[:]()) * self.baseMVA
+        results_s_load_shed = np.array(self.model.s_load_shed[:]()) * self.baseMVA
+        results_s_if_max = np.array(self.model.s_if_max[:, :]()).reshape(self.NT, self.NIF) * self.baseMVA
+        results_s_if_min = np.array(self.model.s_if_min[:, :]()).reshape(self.NT, self.NIF) * self.baseMVA
+        results_s_br_max = np.array(self.model.s_br_max[:, :]()).reshape(self.NT, self.NBR) * self.baseMVA
+        results_s_br_min = np.array(self.model.s_br_min[:, :]()).reshape(self.NT, self.NBR) * self.baseMVA
+
+        slack_vars = {
+            's_ramp_up': results_s_ramp_up,
+            's_ramp_down': results_s_ramp_down,
+            's_over_gen': results_s_over_gen,
+            's_load_shed': results_s_load_shed,
+            's_if_max': results_s_if_max,
+            's_if_min': results_s_if_min,
+            's_br_max': results_s_br_max,
+            's_br_min': results_s_br_min
+        }
 
         # Total cost
         pg_pu = np.array(self.model.PG[:, :]()).reshape(self.NT, self.NG)
-        cost = 0
-        for t in range(self.NT):
-            for g in range(self.NG):
-                cost += self.gencost_0[t, g] + self.gencost_1[t, g] * pg_pu[t, g]
+        gen_cost = sum(self.gencost_0[t, g] + self.gencost_1[t, g] * pg_pu[t, g]
+                       for g in range(self.NG) for t in range(self.NT))
+        over_gen_penalty = sum(self.PenaltyForOverGeneration * results_s_over_gen[t]
+                               for t in range(self.NT))
+        load_shed_penalty = sum(self.PenaltyForLoadShed * results_s_load_shed[t]
+                                for t in range(self.NT))
+        ramp_up_penalty = sum(self.PenaltyForRampViolation * results_s_ramp_up[t, g]
+                              for g in range(self.NG) for t in range(self.NT))
+        ramp_down_penalty = sum(self.PenaltyForRampViolation * results_s_ramp_down[t, g]
+                                for g in range(self.NG) for t in range(self.NT))
+        if_max_penalty = sum(self.PenaltyForInterfaceMWViolation * results_s_if_max[t, n]
+                             for n in range(self.NIF) for t in range(self.NT))
+        if_min_penalty = sum(self.PenaltyForInterfaceMWViolation * results_s_if_min[t, n]
+                             for n in range(self.NIF) for t in range(self.NT))
+        br_max_penalty = sum(self.PenaltyForBranchMwViolation * results_s_br_max[t, n]
+                             for n in range(self.NBR) for t in range(self.NT))
+        br_min_penalty = sum(self.PenaltyForBranchMwViolation * results_s_br_min[t, n]
+                             for n in range(self.NBR) for t in range(self.NT))
 
-        results = {
-            'PG': results_pg,
-            'VA': results_va,
-            'PF': results_pf,
-            'IF': results_if,
-            'LMP': results_lmp,
-            'COST': cost
+        total_cost = gen_cost + over_gen_penalty + load_shed_penalty + \
+                     ramp_up_penalty + ramp_down_penalty + \
+                     if_max_penalty + if_min_penalty + \
+                     br_max_penalty + br_min_penalty
+
+        costs = {
+            'total_cost': total_cost,
+            'gen_cost': gen_cost,
+            'over_gen_penalty': over_gen_penalty,
+            'load_shed_penalty': load_shed_penalty,
+            'ramp_up_penalty': ramp_up_penalty,
+            'ramp_down_penalty': ramp_down_penalty,
+            'if_max_penalty': if_max_penalty,
+            'if_min_penalty': if_min_penalty,
+            'br_max_penalty': br_max_penalty,
+            'br_min_penalty': br_min_penalty
         }
+
+        # Combine results
+        results = {**vars, **slack_vars, **costs}
 
         return results
 
@@ -725,22 +778,10 @@ class NYGrid:
         print('Number of branches: {}'.format(self.NBR))
         print('Number of time periods: {}'.format(self.NT))
 
-        num_vars = len(self.model.PG) \
-                   + len(self.model.VA) \
-                   + len(self.model.PF)
+        num_vars = self.model.nvariables()
         print('Number of variables: {}'.format(num_vars))
 
-        num_constraints = len(self.model.c_br_flow) \
-                          + len(self.model.c_br_max) \
-                          + len(self.model.c_br_min) \
-                          + len(self.model.c_gen_max) \
-                          + len(self.model.c_gen_min) \
-                          + len(self.model.c_pf) \
-                          + len(self.model.c_gen_ramp_up) \
-                          + len(self.model.c_gen_ramp_down) \
-                          + len(self.model.c_dcline) \
-                          + len(self.model.c_if_max) \
-                          + len(self.model.c_if_min)
+        num_constraints = self.model.nconstraints()
         print('Number of constraints: {}'.format(num_constraints))
 
     def get_last_gen(self, model_multi_opf):

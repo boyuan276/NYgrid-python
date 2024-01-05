@@ -13,31 +13,10 @@ from pyomo.opt import SolverStatus, TerminationCondition
 import numpy as np
 import pandas as pd
 import pypower.api as pp
-# Import pypower data indexing
-from pypower.idx_bus import *
-from pypower.idx_gen import *
-from pypower.idx_brch import *
-from pypower.idx_cost import *
+from nygrid.ppc_idx import *
 from nygrid.utlis import format_date
 from nygrid.optimizer import Optimizer
 import logging
-
-# Define PyPower dc line matrix indices
-DC_F_BUS = 0
-DC_T_BUS = 1
-DC_BR_STATUS = 2
-DC_PF = 3
-DC_PT = 4
-DC_QF = 5
-DC_QT = 6
-DC_VF = 7
-DC_VT = 8
-DC_PMIN = 9
-DC_PMAX = 10
-DC_QMINF = 11
-DC_QMAXF = 12
-DC_QMINT = 13
-DC_QMAXT = 14
 
 
 def check_status(results):
@@ -69,7 +48,7 @@ def check_status(results):
     return status
 
 
-def convert_dcline_2_gen(ppc):
+def convert_dcline_2_gen(ppc, dcline_prop=None):
     """
     Convert DC lines to generators and add their parameters in the PyPower matrices.
 
@@ -77,27 +56,36 @@ def convert_dcline_2_gen(ppc):
     ----------
     ppc: dict
         PyPower case dictionary.
+    dcline_prop: numpy.ndarray
+        DC line properties.
 
     Returns
     -------
     ppc_dc: dict
         PyPower case dictionary with DC lines converted to generators.
-    NDCL: int
+    num_dcline: int
         Number of DC lines.
         ppc (dict): PyPower case dictionary.
     """
+
+    # TODO: Use dcline prop from an external file
 
     # Get PyPower case information
     ppc_dc = ppc.copy()
     baseMVA = ppc_dc['baseMVA']
     gen = ppc_dc['gen']
     gencost = ppc_dc['gencost']
-    dcline = ppc_dc['dcline']
     genfuel = ppc_dc['genfuel']
+
+    if dcline_prop is not None and dcline_prop.size > 0:
+        dcline = dcline_prop
+    else:
+        dcline = ppc_dc['dcline']
+        Warning('No DC line properties are provided. Use default values from the PyPower case.')
 
     # Set gen parameters of the DC line converted generators
     num_dcline = dcline.shape[0]
-    dcline_gen = np.zeros((num_dcline * 2, 21))
+    dcline_gen = np.zeros((num_dcline * 2, 21))  # One for from bus, one for to bus
     dcline_gen[:, GEN_BUS] = np.concatenate([dcline[:, DC_F_BUS],
                                              dcline[:, DC_T_BUS]])
     dcline_gen[:, PG] = np.concatenate([-dcline[:, DC_PF],
@@ -131,10 +119,78 @@ def convert_dcline_2_gen(ppc):
     ppc_dc['gencost'] = np.concatenate([gencost, dcline_gencost])
 
     # Add the DC line converted generators to the genfuel list
-    dcline_genfuel = ['dc line'] * num_dcline * 2
+    dcline_genfuel = np.array(['DC Line From'] * num_dcline
+                           + ['DC Line To'] * num_dcline)
     ppc_dc['genfuel'] = np.concatenate([genfuel, dcline_genfuel])
 
     return ppc_dc, num_dcline
+
+
+def convert_esr_2_gen(ppc, esr_prop=None):
+    """
+    Convert ESR to generators and add their parameters in the PyPower matrices.
+
+    Parameters
+    ----------
+    ppc: dict
+        PyPower case dictionary.
+    esr_prop: numpy.ndarray
+        ESR properties.
+
+    Returns
+    -------
+    ppc_esr: dict
+        PyPower case dictionary with ESR converted to generators.
+    num_esr: int
+        Number of ESR.
+    """
+
+    # Get PyPower case information
+    ppc_esr = ppc.copy()
+    baseMVA = ppc_esr['baseMVA']
+    gen = ppc_esr['gen']
+    gencost = ppc_esr['gencost']
+    genfuel = ppc_esr['genfuel']
+
+    if esr_prop is None or esr_prop.size == 0:
+        Warning('No ESR properties are provided.')
+        return ppc_esr, 0
+
+    # Set gen parameters of the ESR converted generators
+    num_esr = esr_prop.shape[0]
+    esr_gen = np.zeros((num_esr * 2, 21))  # One for charging, one for discharging
+    esr_gen[:, GEN_BUS] = np.concatenate([esr_prop[:, ESR_BUS],
+                                          esr_prop[:, ESR_BUS]])
+    esr_gen[:, PG] = np.concatenate([esr_prop[:, ESR_CRG_MAX],
+                                     -esr_prop[:, ESR_DIS_MAX]])
+    esr_gen[:, QG] = np.zeros(num_esr * 2)
+    esr_gen[:, QMAX] = np.zeros(num_esr * 2)
+    esr_gen[:, QMIN] = np.zeros(num_esr * 2)
+    esr_gen[:, VG] = np.ones(num_esr * 2)
+    esr_gen[:, MBASE] = np.ones(num_esr * 2) * baseMVA
+    esr_gen[:, GEN_STATUS] = np.ones(num_esr * 2)
+    esr_gen[:, PMAX] = np.concatenate([esr_prop[:, ESR_CRG_MAX],
+                                       esr_prop[:, ESR_DIS_MAX]])
+    esr_gen[:, PMIN] = np.zeros(num_esr * 2)
+    esr_gen[:, RAMP_AGC] = np.ones(num_esr * 2) * 1e10  # Unlimited ramp rate
+    esr_gen[:, RAMP_10] = np.ones(num_esr * 2) * 1e10  # Unlimited ramp rate
+    esr_gen[:, RAMP_30] = np.ones(num_esr * 2) * 1e10  # Unlimited ramp rate
+    # Add the ESR converted generators to the gen matrix
+    ppc_esr['gen'] = np.concatenate([gen, esr_gen])
+
+    # Set gencost parameters of the ESR converted generators
+    esr_gencost = np.zeros((num_esr * 2, 6))
+    esr_gencost[:, MODEL] = np.ones(num_esr * 2) * POLYNOMIAL
+    esr_gencost[:, NCOST] = np.ones(num_esr * 2) * 2
+    # Add the ESR converted generators to the gencost matrix
+    ppc_esr['gencost'] = np.concatenate([gencost, esr_gencost])
+
+    # Add the ESR converted generators to the genfuel list
+    esr_genfuel = np.array(['ESR Charging'] * num_esr
+                           + ['ESR Discharging'] * num_esr)
+    ppc_esr['genfuel'] = np.concatenate([genfuel, esr_genfuel])
+
+    return ppc_esr, num_esr
 
 
 class NYGrid:
@@ -144,7 +200,7 @@ class NYGrid:
     """
 
     def __init__(self, ppc_filename, start_datetime, end_datetime,
-                 verbose=False):
+                 dcline_prop=None, esr_prop=None, verbose=False):
         """
         Initialize the NYGrid model.
 
@@ -204,10 +260,15 @@ class NYGrid:
         self.ppc['baseMVA'] = float(self.ppc['baseMVA'])
 
         # Convert DC line to generators and add to gen matrix
-        self.ppc_dc, self.NDCL = convert_dcline_2_gen(self.ppc)
+        self.ppc_dc, self.NDCL = convert_dcline_2_gen(self.ppc, dcline_prop)
+
+        # Convert ESR to generators and add to gen matrix
+        self.ppc_dc_esr, self.NESR = convert_esr_2_gen(self.ppc_dc, esr_prop)
+
+        # TODO: Change indexing from ppc_dc to ppc_dc_esr
 
         # Convert to internal indexing
-        self.ppc_int = pp.ext2int(self.ppc_dc)
+        self.ppc_int = pp.ext2int(self.ppc_dc_esr)
         # self.ppc_int = self.ppc_dc
 
         self.baseMVA = self.ppc_int['baseMVA']

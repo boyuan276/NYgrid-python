@@ -234,7 +234,7 @@ def single_opf_new(B, Bf, gen_map, load_map, load, gencost_0, gencost_1, dc_idx_
 
     # DC line power balance
     def dcline_rule(model, dc):
-        return model.pg[model.dc_idx_f[dc]] + model.pg[model.dc_idx_t[dc]] == 0
+        return model.pg[model.dcline_idx_f[dc]] + model.pg[model.dcline_idx_t[dc]] == 0
     model.c_dcline = Constraint(model.DC, rule=dcline_rule)
 
     # Interface flow limit
@@ -481,7 +481,7 @@ def dcline2gen(ppc):
     
     Returns:
         ppc (dict): updated PyPower case dictionary.
-        num_dcline (float): number of DC lines.
+        NDCL (float): number of DC lines.
     '''
 
     # Define dcline matrix indices
@@ -569,7 +569,7 @@ def opf_results_single(model_single, ppc_int):
     results_pg = pd.Series(results_pg, index=gen_order).sort_index()
     
     # Bus phase angle
-    results_va = np.array(model_single.Va[:]())*180/np.pi
+    results_va = np.array(model_single.VA[:]()) * 180 / np.pi
     # Just to compare with PyPower
     results_va = results_va - 73.4282
     # Convert negative numbers to 0-360
@@ -638,7 +638,7 @@ def opf_results_multi(model_multi, ppc_int, start_time, end_time):
                                 columns=gen_order).sort_index(axis=1)
     
     # Bus phase angle
-    results_va = np.array(model_multi.Va[:,:]()).reshape(num_time, num_bus)*180/np.pi
+    results_va = np.array(model_multi.VA[:, :]()).reshape(num_time, num_bus) * 180 / np.pi
     # Just to compare with PyPower
     results_va = results_va - 73.4282
     # Convert negative numbers to 0-360

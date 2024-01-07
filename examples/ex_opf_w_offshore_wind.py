@@ -203,12 +203,12 @@ for d in range(len(timestamp_list)-1):
                         verbose=True)
 
     # Read grid data
-    nygrid_sim.ts_set_load_sch(load_profile_renewable)
-    nygrid_sim.ts_set_gen_mw_sch(gen_profile)
-    nygrid_sim.ts_set_gen_max_sch(genmax_profile)
-    nygrid_sim.ts_set_gen_min_sch(genmin_profile)
-    nygrid_sim.ts_set_gen_ramp_sch(genramp30_profile)
-    nygrid_sim.ts_set_gen_cost_sch(gencost0_profile, gencost1_profile)
+    nygrid_sim.set_load_sch(load_profile_renewable)
+    nygrid_sim.set_gen_mw_sch(gen_profile)
+    nygrid_sim.set_gen_max_sch(genmax_profile)
+    nygrid_sim.set_gen_min_sch(genmin_profile)
+    nygrid_sim.set_gen_ramp_sch(genramp30_profile)
+    nygrid_sim.set_gen_cost_sch(gencost0_profile, gencost1_profile)
 
     # Process ppc
     nygrid_sim.process_ppc()
@@ -221,7 +221,7 @@ for d in range(len(timestamp_list)-1):
         last_gen = nygrid_sim.get_last_gen(model_multi_opf)
         print('Initial condition set from previous day.')
     
-    nygrid_sim.get_gen_init_data(gen_init=last_gen)
+    nygrid_sim.set_gen_init_data(gen_init=last_gen)
 
     # Check input
     nygrid_sim.check_input_dim()

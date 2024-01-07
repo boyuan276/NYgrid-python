@@ -51,6 +51,8 @@ def check_status(results):
 def convert_dcline_2_gen(ppc, dcline_prop=None):
     """
     Convert DC lines to generators and add their parameters in the PyPower matrices.
+    For each DC line, add two injectors: one at FROM bus and another at TO bus.
+    The injection of them are linked in the optimization.
 
     Parameters
     ----------
@@ -85,7 +87,7 @@ def convert_dcline_2_gen(ppc, dcline_prop=None):
 
     # Set gen parameters of the DC line converted generators
     num_dcline = dcline.shape[0]
-    dcline_gen = np.zeros((num_dcline * 2, 21))  # One for from bus, one for to bus
+    dcline_gen = np.zeros((num_dcline * 2, 21))  # One at from bus, one at to bus
     dcline_gen[:, GEN_BUS] = np.concatenate([dcline[:, DC_F_BUS],
                                              dcline[:, DC_T_BUS]])
     dcline_gen[:, PG] = np.concatenate([-dcline[:, DC_PF],
@@ -120,7 +122,7 @@ def convert_dcline_2_gen(ppc, dcline_prop=None):
 
     # Add the DC line converted generators to the genfuel list
     dcline_genfuel = np.array(['DC Line From'] * num_dcline
-                           + ['DC Line To'] * num_dcline)
+                              + ['DC Line To'] * num_dcline)
     ppc_dc['genfuel'] = np.concatenate([genfuel, dcline_genfuel])
 
     return ppc_dc, num_dcline
@@ -129,6 +131,8 @@ def convert_dcline_2_gen(ppc, dcline_prop=None):
 def convert_esr_2_gen(ppc, esr_prop=None):
     """
     Convert ESR to generators and add their parameters in the PyPower matrices.
+    For each ESR, add one injector to represent the combined injection of the ESR.
+    Positive injection is discharging and negative injection is charging.
 
     Parameters
     ----------
@@ -158,36 +162,33 @@ def convert_esr_2_gen(ppc, esr_prop=None):
 
     # Set gen parameters of the ESR converted generators
     num_esr = esr_prop.shape[0]
-    esr_gen = np.zeros((num_esr * 2, 21))  # One for charging, one for discharging
-    esr_gen[:, GEN_BUS] = np.concatenate([esr_prop[:, ESR_BUS],
-                                          esr_prop[:, ESR_BUS]])
-    esr_gen[:, PG] = np.concatenate([esr_prop[:, ESR_CRG_MAX],
-                                     -esr_prop[:, ESR_DIS_MAX]])
-    esr_gen[:, QG] = np.zeros(num_esr * 2)
-    esr_gen[:, QMAX] = np.zeros(num_esr * 2)
-    esr_gen[:, QMIN] = np.zeros(num_esr * 2)
-    esr_gen[:, VG] = np.ones(num_esr * 2)
-    esr_gen[:, MBASE] = np.ones(num_esr * 2) * baseMVA
-    esr_gen[:, GEN_STATUS] = np.ones(num_esr * 2)
-    esr_gen[:, PMAX] = np.concatenate([esr_prop[:, ESR_CRG_MAX],
-                                       esr_prop[:, ESR_DIS_MAX]])
-    esr_gen[:, PMIN] = np.zeros(num_esr * 2)
-    esr_gen[:, RAMP_AGC] = np.ones(num_esr * 2) * 1e10  # Unlimited ramp rate
-    esr_gen[:, RAMP_10] = np.ones(num_esr * 2) * 1e10  # Unlimited ramp rate
-    esr_gen[:, RAMP_30] = np.ones(num_esr * 2) * 1e10  # Unlimited ramp rate
+    esr_gen = np.zeros((num_esr, 21))  # One for charging, one for discharging
+    esr_gen[:, GEN_BUS] = np.array(esr_prop[:, ESR_BUS])
+    esr_gen[:, PG] = np.zeros(num_esr)
+    esr_gen[:, QG] = np.zeros(num_esr)
+    esr_gen[:, QMAX] = np.zeros(num_esr)
+    esr_gen[:, QMIN] = np.zeros(num_esr)
+    esr_gen[:, VG] = np.ones(num_esr)
+    esr_gen[:, MBASE] = np.ones(num_esr) * baseMVA
+    esr_gen[:, GEN_STATUS] = np.ones(num_esr)
+    esr_gen[:, PMAX] = np.array(esr_prop[:, ESR_DIS_MAX])
+    esr_gen[:, PMIN] = np.array(-1 * esr_prop[:, ESR_CRG_MAX])
+    esr_gen[:, RAMP_AGC] = np.ones(num_esr) * 1e10  # Unlimited ramp rate
+    esr_gen[:, RAMP_10] = np.ones(num_esr) * 1e10  # Unlimited ramp rate
+    esr_gen[:, RAMP_30] = np.ones(num_esr) * 1e10  # Unlimited ramp rate
     # Add the ESR converted generators to the gen matrix
     ppc_esr['gen'] = np.concatenate([gen, esr_gen])
 
     # Set gencost parameters of the ESR converted generators
-    esr_gencost = np.zeros((num_esr * 2, 6))
-    esr_gencost[:, MODEL] = np.ones(num_esr * 2) * POLYNOMIAL
-    esr_gencost[:, NCOST] = np.ones(num_esr * 2) * 2
+    # TODO: Add non-zero cost to prevent simultaneous charging and discharging
+    esr_gencost = np.zeros((num_esr, 6))
+    esr_gencost[:, MODEL] = np.ones(num_esr) * POLYNOMIAL
+    esr_gencost[:, NCOST] = np.ones(num_esr) * 2
     # Add the ESR converted generators to the gencost matrix
     ppc_esr['gencost'] = np.concatenate([gencost, esr_gencost])
 
     # Add the ESR converted generators to the genfuel list
-    esr_genfuel = np.array(['ESR Charging'] * num_esr
-                           + ['ESR Discharging'] * num_esr)
+    esr_genfuel = np.array(['ESR'] * num_esr)
     ppc_esr['genfuel'] = np.concatenate([genfuel, esr_genfuel])
 
     return ppc_esr, num_esr
@@ -265,8 +266,6 @@ class NYGrid:
         # Convert ESR to generators and add to gen matrix
         self.ppc_dc_esr, self.NESR = convert_esr_2_gen(self.ppc_dc, esr_prop)
 
-        # TODO: Change indexing from ppc_dc to ppc_dc_esr
-
         # Convert to internal indexing
         self.ppc_int = pp.ext2int(self.ppc_dc_esr)
         # self.ppc_int = self.ppc_dc
@@ -298,11 +297,16 @@ class NYGrid:
         self.gen_map = np.zeros((self.NB, self.NG))
         self.gen_map[self.gen_bus, range(self.NG)] = 1
 
-        # Get index of DC line converted generators in internal indexing
+        # Get index of existing generators (not DC line or ESR converted)
         self.gen_i2e = self.ppc_int['order']['gen']['i2e']
-        self.dc_idx_f = self.gen_i2e[self.NG - self.NDCL * 2: self.NG - self.NDCL]
-        self.dc_idx_t = self.gen_i2e[self.NG - self.NDCL: self.NG]
-        self.gen_idx_non_dc = self.gen_i2e[:self.NG - self.NDCL * 2]
+        self.gen_idx_non_cvt = self.gen_i2e[:self.NG - self.NDCL * 2 - self.NESR]
+
+        # Get index of DC line converted generators in internal indexing
+        self.dcline_idx_f = self.gen_i2e[self.NG - self.NDCL * 2 - self.NESR: self.NG - self.NDCL - self.NESR]
+        self.dcline_idx_t = self.gen_i2e[self.NG - self.NDCL - self.NESR: self.NG - self.NESR]
+
+        # Get index of ESR converted generators in internal indexing
+        self.esr_idx = self.gen_i2e[self.NG - self.NESR: self.NG]
 
         # Get mapping from load to bus
         self.load_map = np.zeros((self.NB, self.NL))
@@ -363,6 +367,40 @@ class NYGrid:
 
         # Generator initial condition
         self.gen_init = None
+
+        # Add ESR properties
+
+        if esr_prop is not None and esr_prop.size > 0:
+
+            # ESR charging power upper limit in p.u.
+            self.esr_crg_max = np.ones((self.NT, self.NESR)) * esr_prop[:, ESR_CRG_MAX] / self.baseMVA
+
+            # ESR discharging power upper limit in p.u.
+            self.esr_dis_max = np.ones((self.NT, self.NESR)) * esr_prop[:, ESR_DIS_MAX] / self.baseMVA
+
+            # ESR charging efficiency
+            self.esr_crg_eff = np.ones((self.NT, self.NESR)) * esr_prop[:, ESR_CRG_EFF]
+
+            # ESR discharging efficiency
+            self.esr_dis_eff = np.ones((self.NT, self.NESR)) * esr_prop[:, ESR_DIS_EFF]
+
+            # ESR SOC upper limit in p.u.
+            self.esr_soc_max = np.ones((self.NT, self.NESR)) * esr_prop[:, ESR_SOC_MAX] / self.baseMVA
+
+            # ESR SOC lower limit in p.u.
+            self.esr_soc_min = np.ones((self.NT, self.NESR)) * esr_prop[:, ESR_SOC_MIN] / self.baseMVA
+
+            # ESR SOC initial condition in p.u.
+            self.esr_init = np.ones(self.NESR) * esr_prop[:, ESR_SOC_INI] / self.baseMVA
+
+            # ESR SOC target condition in p.u.
+            self.esr_target = np.ones(self.NESR) * esr_prop[:, ESR_SOC_TGT] / self.baseMVA
+
+            # ESR charging cost
+            self.esrcost_crg = np.ones((self.NT, self.NESR)) * esr_prop[:, ESR_CRG_COST] * self.baseMVA
+
+            # ESR discharging cost
+            self.esrcost_dis = np.ones((self.NT, self.NESR)) * esr_prop[:, ESR_DIS_COST] * self.baseMVA
 
         # %% Create Pyomo model
         self.model = None
@@ -447,12 +485,12 @@ class NYGrid:
         if gen_mw_sch is not None and gen_mw_sch.size > 0:
             # Thermal generators: Use user-defined time series schedule
             self.gen_hist = np.empty((self.NT, self.NG))
-            self.gen_hist[:, self.gen_idx_non_dc] = gen_mw_sch / self.baseMVA
+            self.gen_hist[:, self.gen_idx_non_cvt] = gen_mw_sch / self.baseMVA
             # HVDC Proxy generators: Use default values from the PyPower case
-            self.gen_hist[:, self.dc_idx_f] = np.ones(
-                (self.NT, self.NDCL)) * self.gen[self.dc_idx_f, PG] / self.baseMVA
-            self.gen_hist[:, self.dc_idx_t] = np.ones(
-                (self.NT, self.NDCL)) * self.gen[self.dc_idx_t, PG] / self.baseMVA
+            self.gen_hist[:, self.dcline_idx_f] = np.ones(
+                (self.NT, self.NDCL)) * self.gen[self.dcline_idx_f, PG] / self.baseMVA
+            self.gen_hist[:, self.dcline_idx_t] = np.ones(
+                (self.NT, self.NDCL)) * self.gen[self.dcline_idx_t, PG] / self.baseMVA
         else:
             raise ValueError('No generation profile is provided.')
 
@@ -477,12 +515,12 @@ class NYGrid:
         if gen_max_sch is not None and gen_max_sch.size > 0:
             # Thermal generators: Use user-defined time series schedule
             self.gen_max = np.empty((self.NT, self.NG))
-            self.gen_max[:, self.gen_idx_non_dc] = gen_max_sch / self.baseMVA
+            self.gen_max[:, self.gen_idx_non_cvt] = gen_max_sch / self.baseMVA
             # HVDC Proxy generators: Use default values from the PyPower case
-            self.gen_max[:, self.dc_idx_f] = np.ones(
-                (self.NT, self.NDCL)) * self.gen[self.dc_idx_f, PMAX] / self.baseMVA
-            self.gen_max[:, self.dc_idx_t] = np.ones(
-                (self.NT, self.NDCL)) * self.gen[self.dc_idx_t, PMAX] / self.baseMVA
+            self.gen_max[:, self.dcline_idx_f] = np.ones(
+                (self.NT, self.NDCL)) * self.gen[self.dcline_idx_f, PMAX] / self.baseMVA
+            self.gen_max[:, self.dcline_idx_t] = np.ones(
+                (self.NT, self.NDCL)) * self.gen[self.dcline_idx_t, PMAX] / self.baseMVA
         else:
             raise ValueError('No generation capacity profile is provided.')
 
@@ -507,12 +545,12 @@ class NYGrid:
         if gen_min_sch is not None and gen_min_sch.size > 0:
             # Thermal generators: Use user-defined time series schedule
             self.gen_min = np.empty((self.NT, self.NG))
-            self.gen_min[:, self.gen_idx_non_dc] = gen_min_sch / self.baseMVA
+            self.gen_min[:, self.gen_idx_non_cvt] = gen_min_sch / self.baseMVA
             # HVDC Proxy generators: Use default values from the PyPower case
-            self.gen_min[:, self.dc_idx_f] = np.ones(
-                (self.NT, self.NDCL)) * self.gen[self.dc_idx_f, PMIN] / self.baseMVA
-            self.gen_min[:, self.dc_idx_t] = np.ones(
-                (self.NT, self.NDCL)) * self.gen[self.dc_idx_t, PMIN] / self.baseMVA
+            self.gen_min[:, self.dcline_idx_f] = np.ones(
+                (self.NT, self.NDCL)) * self.gen[self.dcline_idx_f, PMIN] / self.baseMVA
+            self.gen_min[:, self.dcline_idx_t] = np.ones(
+                (self.NT, self.NDCL)) * self.gen[self.dcline_idx_t, PMIN] / self.baseMVA
         else:
             raise ValueError('No generation capacity profile is provided.')
 
@@ -543,12 +581,12 @@ class NYGrid:
         if gen_ramp_sch is not None and gen_ramp_sch.size > 0:
             # Thermal generators: Use user-defined time series schedule
             self.ramp_up = np.empty((self.NT, self.NG))
-            self.ramp_up[:, self.gen_idx_non_dc] = gen_ramp_sch / self.baseMVA
+            self.ramp_up[:, self.gen_idx_non_cvt] = gen_ramp_sch / self.baseMVA
             # HVDC Proxy generators: Use default values from the PyPower case
-            self.ramp_up[:, self.dc_idx_f] = np.ones(
-                (self.NT, self.NDCL)) * self.gen[self.dc_idx_f, RAMP_30] * 2 / self.baseMVA
-            self.ramp_up[:, self.dc_idx_t] = np.ones(
-                (self.NT, self.NDCL)) * self.gen[self.dc_idx_t, RAMP_30] * 2 / self.baseMVA
+            self.ramp_up[:, self.dcline_idx_f] = np.ones(
+                (self.NT, self.NDCL)) * self.gen[self.dcline_idx_f, RAMP_30] * 2 / self.baseMVA
+            self.ramp_up[:, self.dcline_idx_t] = np.ones(
+                (self.NT, self.NDCL)) * self.gen[self.dcline_idx_t, RAMP_30] * 2 / self.baseMVA
         else:
             raise ValueError('No ramp rate profile is provided.')
 
@@ -579,12 +617,12 @@ class NYGrid:
         if gen_cost0_sch is not None and gen_cost0_sch.size > 0:
             # Thermal generators: Use user-defined time series schedule
             self.gencost_0 = np.empty((self.NT, self.NG))
-            self.gencost_0[:, self.gen_idx_non_dc] = gen_cost0_sch
+            self.gencost_0[:, self.gen_idx_non_cvt] = gen_cost0_sch
             # HVDC Proxy generators: Use default values from the PyPower case
-            self.gencost_0[:, self.dc_idx_f] = np.ones(
-                (self.NT, self.NDCL)) * self.gencost[self.dc_idx_f, COST + 1]
-            self.gencost_0[:, self.dc_idx_t] = np.ones(
-                (self.NT, self.NDCL)) * self.gencost[self.dc_idx_t, COST + 1]
+            self.gencost_0[:, self.dcline_idx_f] = np.ones(
+                (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_f, COST + 1]
+            self.gencost_0[:, self.dcline_idx_t] = np.ones(
+                (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_t, COST + 1]
         else:
             raise ValueError('No generation cost profile is provided.')
 
@@ -592,12 +630,12 @@ class NYGrid:
         if gen_cost1_sch is not None and gen_cost1_sch.size > 0:
             # Thermal generators: Use user-defined time series schedule
             self.gencost_1 = np.empty((self.NT, self.NG))
-            self.gencost_1[:, self.gen_idx_non_dc] = gen_cost1_sch * self.baseMVA
+            self.gencost_1[:, self.gen_idx_non_cvt] = gen_cost1_sch * self.baseMVA
             # HVDC Proxy generators: Use default values from the PyPower case
-            self.gencost_1[:, self.dc_idx_f] = np.ones(
-                (self.NT, self.NDCL)) * self.gencost[self.dc_idx_f, COST] * self.baseMVA
-            self.gencost_1[:, self.dc_idx_t] = np.ones(
-                (self.NT, self.NDCL)) * self.gencost[self.dc_idx_t, COST] * self.baseMVA
+            self.gencost_1[:, self.dcline_idx_f] = np.ones(
+                (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_f, COST] * self.baseMVA
+            self.gencost_1[:, self.dcline_idx_t] = np.ones(
+                (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_t, COST] * self.baseMVA
         else:
             raise ValueError('No generation cost profile is provided.')
 
@@ -648,9 +686,17 @@ class NYGrid:
         optimizer.add_vars_pf()
         optimizer.add_vars_dual()
 
+        # Add ES variables if there are ESRs
+        if self.NESR > 0:
+            optimizer.add_vars_es()
+
         # Add constraints
         optimizer.add_constrs_ed()
         optimizer.add_constrs_pf()
+
+        # Add ES constraints if there are ESRs
+        if self.NESR > 0:
+            optimizer.add_constrs_es()
 
         # Add objective
         optimizer.add_obj()
@@ -807,10 +853,12 @@ class NYGrid:
         br_min_penalty = sum(self.PenaltyForBranchMwViolation * results_s_br_min[t, n]
                              for n in range(self.NBR) for t in range(self.NT))
 
-        total_cost = gen_cost + over_gen_penalty + load_shed_penalty + \
-                     ramp_up_penalty + ramp_down_penalty + \
-                     if_max_penalty + if_min_penalty + \
-                     br_max_penalty + br_min_penalty
+        total_cost = (gen_cost + over_gen_penalty + load_shed_penalty
+                      + ramp_up_penalty + ramp_down_penalty
+                      + if_max_penalty + if_min_penalty
+                      + br_max_penalty + br_min_penalty)
+
+        # TODO: Add ES cost and penalty
 
         costs = {
             'total_cost': total_cost,

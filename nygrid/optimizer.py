@@ -215,7 +215,7 @@ class Optimizer:
                        for n in self.branches for t in self.times) * self.nygrid.PenaltyForBranchMwViolation
 
         self.model.obj = pyo.Objective(expr=(gen_cost_ene_expr(self.model)
-                                             + esr_cost_ene_expr(self.model)
+                                             # + esr_cost_ene_expr(self.model)
                                              + over_gen_penalty_expr(self.model) + load_shed_penalty_expr(self.model)
                                              + ramp_down_penalty_expr(self.model) + ramp_up_penalty_expr(self.model)
                                              + if_max_penalty_expr(self.model) + if_min_penalty_expr(self.model)
@@ -277,14 +277,14 @@ class Optimizer:
 
         # 3.1. DC line power balance constraint
         def dc_line_power_balance_rule(model, t, n):
-            return model.PG[t, self.nygrid.dc_idx_f[n]] == - model.PG[t, self.nygrid.dc_idx_t[n]]
+            return model.PG[t, self.nygrid.dcline_idx_f[n]] == - model.PG[t, self.nygrid.dcline_idx_t[n]]
 
         self.model.c_dcline = pyo.Constraint(self.times, self.dclines,
                                              rule=dc_line_power_balance_rule)
 
         logging.debug('Added constraints for ED module.')
 
-        # 4.1. Load real power setpoint
+        # 4.1. Load real power set point
         def load_power_rule(model, t, ld):
             return model.PL[t, ld] == self.nygrid.load_pu[t, ld]
 
@@ -410,58 +410,64 @@ class Optimizer:
         None
         """
 
-        # TODO: Define ES parameters:
-        # esrcost_crg, esrcost_dis, esr_max, esr_min, esr_init, esr_target,
-        # esr_eff_crg, esr_eff_dis. esr_power
-
         # 1.1. ESR real power output upper limit in charging mode
         def esr_power_crg_max_rule(model, t, esr):
-            return model.esrPCrg[t, esr] <= self.nygrid.esr_power[t, esr]
+            return model.esrPCrg[t, esr] <= self.nygrid.esr_crg_max[t, esr]
 
         self.model.c_esr_power_crg_max = pyo.Constraint(self.times, self.esrs,
                                                         rule=esr_power_crg_max_rule)
 
         # 1.2. ESR real power output upper limit in discharging mode
         def esr_power_dis_max_rule(model, t, esr):
-            return model.esrPDis[t, esr] <= self.nygrid.esr_power[t, esr]
+            return model.esrPDis[t, esr] <= self.nygrid.esr_dis_max[t, esr]
 
         self.model.c_esr_power_dis_max = pyo.Constraint(self.times, self.esrs,
                                                         rule=esr_power_dis_max_rule)
+
+        # 1.3. ESR combined real power output
+        def esr_power_combined_rule(model, t, esr):
+            return model.PG[t, self.nygrid.esr_idx[esr]] == model.esrPDis[t, esr] - model.esrPCrg[t, esr]
+
+        self.model.c_esr_power_combined = pyo.Constraint(self.times, self.esrs,
+                                                         rule=esr_power_combined_rule)
 
         # 2.1. ESR SOC update
         def esr_soc_update_rule(model, t, esr):
             if t == 0:
                 if self.nygrid.esr_init is not None:
                     return model.esrSOC[t, esr] == self.nygrid.esr_init[esr] \
-                        + model.esrPCrg[t, esr] * self.nygrid.esr_eff_crg[esr] \
-                        - model.esrPDis[t, esr] / self.nygrid.esr_eff_dis[esr]
+                        + model.esrPCrg[t, esr] * self.nygrid.esr_crg_eff[t, esr] \
+                        - model.esrPDis[t, esr] / self.nygrid.esr_dis_eff[t, esr]
                 else:
                     return pyo.Constraint.Skip
             else:
                 return model.esrSOC[t, esr] == model.esrSOC[t - 1, esr] \
-                    + model.esrPCrg[t, esr] * self.nygrid.esr_eff_crg[esr] \
-                    - model.esrPDis[t, esr] / self.nygrid.esr_eff_dis[esr]
+                    + model.esrPCrg[t, esr] * self.nygrid.esr_crg_eff[t, esr] \
+                    - model.esrPDis[t, esr] / self.nygrid.esr_dis_eff[t, esr]
 
         self.model.c_esr_soc_update = pyo.Constraint(self.times, self.esrs,
                                                      rule=esr_soc_update_rule)
 
         # 2.2. ESR SOC upper limit
         def esr_soc_max_rule(model, t, esr):
-            return model.esrSOC[t, esr] <= self.nygrid.esr_max[esr]
+            return model.esrSOC[t, esr] <= self.nygrid.esr_soc_max[t, esr]
 
         self.model.c_esr_soc_max = pyo.Constraint(self.times, self.esrs,
                                                   rule=esr_soc_max_rule)
 
         # 2.3. ESR SOC lower limit
         def esr_soc_min_rule(model, t, esr):
-            return model.esrSOC[t, esr] >= self.nygrid.esr_min[esr]
+            return model.esrSOC[t, esr] >= self.nygrid.esr_soc_min[t, esr]
 
         self.model.c_esr_soc_min = pyo.Constraint(self.times, self.esrs,
                                                   rule=esr_soc_min_rule)
 
         # 2.4. ESR SOC target
         def esr_soc_target_rule(model, t, esr):
-            return model.esrSOC[t, esr] == self.nygrid.esr_target[t, esr]
+            if t == self.nygrid.NT - 1:
+                return model.esrSOC[t, esr] == self.nygrid.esr_target[esr]
+            else:
+                return pyo.Constraint.Skip
 
         self.model.c_esr_soc_target = pyo.Constraint(self.times, self.esrs,
                                                      rule=esr_soc_target_rule)

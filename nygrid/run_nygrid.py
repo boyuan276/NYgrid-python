@@ -107,9 +107,9 @@ def convert_dcline_2_gen(ppc, dcline_prop=None):
                                           dcline[:, DC_PMAX]])
     dcline_gen[:, PMIN] = np.concatenate([dcline[:, DC_PMIN],
                                           dcline[:, DC_PMIN]])
-    dcline_gen[:, RAMP_AGC] = np.ones(num_dcline * 2) * 1e10  # Unlimited ramp rate
-    dcline_gen[:, RAMP_10] = np.ones(num_dcline * 2) * 1e10  # Unlimited ramp rate
-    dcline_gen[:, RAMP_30] = np.ones(num_dcline * 2) * 1e10  # Unlimited ramp rate
+    dcline_gen[:, RAMP_AGC] = np.ones(num_dcline * 2) * 1e6  # Unlimited ramp rate
+    dcline_gen[:, RAMP_10] = np.ones(num_dcline * 2) * 1e6  # Unlimited ramp rate
+    dcline_gen[:, RAMP_30] = np.ones(num_dcline * 2) * 1e6  # Unlimited ramp rate
     # Add the DC line converted generators to the gen matrix
     ppc_dc['gen'] = np.concatenate([gen, dcline_gen])
 
@@ -173,9 +173,9 @@ def convert_esr_2_gen(ppc, esr_prop=None):
     esr_gen[:, GEN_STATUS] = np.ones(num_esr)
     esr_gen[:, PMAX] = np.array(esr_prop[:, ESR_DIS_MAX])
     esr_gen[:, PMIN] = np.array(-1 * esr_prop[:, ESR_CRG_MAX])
-    esr_gen[:, RAMP_AGC] = np.ones(num_esr) * 1e10  # Unlimited ramp rate
-    esr_gen[:, RAMP_10] = np.ones(num_esr) * 1e10  # Unlimited ramp rate
-    esr_gen[:, RAMP_30] = np.ones(num_esr) * 1e10  # Unlimited ramp rate
+    esr_gen[:, RAMP_AGC] = np.ones(num_esr) * 1e6  # Unlimited ramp rate
+    esr_gen[:, RAMP_10] = np.ones(num_esr) * 1e6  # Unlimited ramp rate
+    esr_gen[:, RAMP_30] = np.ones(num_esr) * 1e6  # Unlimited ramp rate
     # Add the ESR converted generators to the gen matrix
     ppc_esr['gen'] = np.concatenate([gen, esr_gen])
 
@@ -435,8 +435,19 @@ class NYGrid:
         self.solver = 'gurobi'
 
     def set_options(self, options):
+        """
+        Set solver options and penalty parameters.
 
-        # TODO: Check if this is the right way to set the penalty parameters
+        Parameters
+        ----------
+        options: dict
+            Solver options and penalty parameters.
+
+        Returns
+        -------
+        None
+        """
+
         for key, value in options.items():
             setattr(self, key, value)
             logging.info(f'Set {key} to {value} ...')
@@ -514,13 +525,13 @@ class NYGrid:
         # Generator upper operating limit in p.u.
         if gen_max_sch is not None and gen_max_sch.size > 0:
             # Thermal generators: Use user-defined time series schedule
-            self.gen_max = np.empty((self.NT, self.NG))
             self.gen_max[:, self.gen_idx_non_cvt] = gen_max_sch / self.baseMVA
+
             # HVDC Proxy generators: Use default values from the PyPower case
-            self.gen_max[:, self.dcline_idx_f] = np.ones(
-                (self.NT, self.NDCL)) * self.gen[self.dcline_idx_f, PMAX] / self.baseMVA
-            self.gen_max[:, self.dcline_idx_t] = np.ones(
-                (self.NT, self.NDCL)) * self.gen[self.dcline_idx_t, PMAX] / self.baseMVA
+            # self.gen_max[:, self.dcline_idx_f] = np.ones(
+            #     (self.NT, self.NDCL)) * self.gen[self.dcline_idx_f, PMAX] / self.baseMVA
+            # self.gen_max[:, self.dcline_idx_t] = np.ones(
+            #     (self.NT, self.NDCL)) * self.gen[self.dcline_idx_t, PMAX] / self.baseMVA
         else:
             raise ValueError('No generation capacity profile is provided.')
 
@@ -544,13 +555,13 @@ class NYGrid:
         # Generator lower operating limit in p.u.
         if gen_min_sch is not None and gen_min_sch.size > 0:
             # Thermal generators: Use user-defined time series schedule
-            self.gen_min = np.empty((self.NT, self.NG))
             self.gen_min[:, self.gen_idx_non_cvt] = gen_min_sch / self.baseMVA
+
             # HVDC Proxy generators: Use default values from the PyPower case
-            self.gen_min[:, self.dcline_idx_f] = np.ones(
-                (self.NT, self.NDCL)) * self.gen[self.dcline_idx_f, PMIN] / self.baseMVA
-            self.gen_min[:, self.dcline_idx_t] = np.ones(
-                (self.NT, self.NDCL)) * self.gen[self.dcline_idx_t, PMIN] / self.baseMVA
+            # self.gen_min[:, self.dcline_idx_f] = np.ones(
+            #     (self.NT, self.NDCL)) * self.gen[self.dcline_idx_f, PMIN] / self.baseMVA
+            # self.gen_min[:, self.dcline_idx_t] = np.ones(
+            #     (self.NT, self.NDCL)) * self.gen[self.dcline_idx_t, PMIN] / self.baseMVA
         else:
             raise ValueError('No generation capacity profile is provided.')
 
@@ -580,13 +591,13 @@ class NYGrid:
         # Generator ramp rate limit in p.u./hour
         if gen_ramp_sch is not None and gen_ramp_sch.size > 0:
             # Thermal generators: Use user-defined time series schedule
-            self.ramp_up = np.empty((self.NT, self.NG))
             self.ramp_up[:, self.gen_idx_non_cvt] = gen_ramp_sch / self.baseMVA
+
             # HVDC Proxy generators: Use default values from the PyPower case
-            self.ramp_up[:, self.dcline_idx_f] = np.ones(
-                (self.NT, self.NDCL)) * self.gen[self.dcline_idx_f, RAMP_30] * 2 / self.baseMVA
-            self.ramp_up[:, self.dcline_idx_t] = np.ones(
-                (self.NT, self.NDCL)) * self.gen[self.dcline_idx_t, RAMP_30] * 2 / self.baseMVA
+            # self.ramp_up[:, self.dcline_idx_f] = np.ones(
+            #     (self.NT, self.NDCL)) * self.gen[self.dcline_idx_f, RAMP_30] * 2 / self.baseMVA
+            # self.ramp_up[:, self.dcline_idx_t] = np.ones(
+            #     (self.NT, self.NDCL)) * self.gen[self.dcline_idx_t, RAMP_30] * 2 / self.baseMVA
         else:
             raise ValueError('No ramp rate profile is provided.')
 
@@ -616,26 +627,26 @@ class NYGrid:
         # Linear cost intercept coefficients in p.u.
         if gen_cost0_sch is not None and gen_cost0_sch.size > 0:
             # Thermal generators: Use user-defined time series schedule
-            self.gencost_0 = np.empty((self.NT, self.NG))
             self.gencost_0[:, self.gen_idx_non_cvt] = gen_cost0_sch
+
             # HVDC Proxy generators: Use default values from the PyPower case
-            self.gencost_0[:, self.dcline_idx_f] = np.ones(
-                (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_f, COST + 1]
-            self.gencost_0[:, self.dcline_idx_t] = np.ones(
-                (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_t, COST + 1]
+            # self.gencost_0[:, self.dcline_idx_f] = np.ones(
+            #     (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_f, COST + 1]
+            # self.gencost_0[:, self.dcline_idx_t] = np.ones(
+            #     (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_t, COST + 1]
         else:
             raise ValueError('No generation cost profile is provided.')
 
         # Linear cost slope coefficients in p.u.
         if gen_cost1_sch is not None and gen_cost1_sch.size > 0:
             # Thermal generators: Use user-defined time series schedule
-            self.gencost_1 = np.empty((self.NT, self.NG))
             self.gencost_1[:, self.gen_idx_non_cvt] = gen_cost1_sch * self.baseMVA
+
             # HVDC Proxy generators: Use default values from the PyPower case
-            self.gencost_1[:, self.dcline_idx_f] = np.ones(
-                (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_f, COST] * self.baseMVA
-            self.gencost_1[:, self.dcline_idx_t] = np.ones(
-                (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_t, COST] * self.baseMVA
+            # self.gencost_1[:, self.dcline_idx_f] = np.ones(
+            #     (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_f, COST] * self.baseMVA
+            # self.gencost_1[:, self.dcline_idx_t] = np.ones(
+            #     (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_t, COST] * self.baseMVA
         else:
             raise ValueError('No generation cost profile is provided.')
 
@@ -684,11 +695,13 @@ class NYGrid:
         # Add variables
         optimizer.add_vars_ed()
         optimizer.add_vars_pf()
-        optimizer.add_vars_dual()
 
         # Add ES variables if there are ESRs
         if self.NESR > 0:
             optimizer.add_vars_es()
+
+        # Add dual variables
+        optimizer.add_vars_dual()
 
         # Add constraints
         optimizer.add_constrs_ed()

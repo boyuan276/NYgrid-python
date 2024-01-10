@@ -215,7 +215,7 @@ class Optimizer:
                        for n in self.branches for t in self.times) * self.nygrid.PenaltyForBranchMwViolation
 
         self.model.obj = pyo.Objective(expr=(gen_cost_ene_expr(self.model)
-                                             # + esr_cost_ene_expr(self.model)
+                                             + esr_cost_ene_expr(self.model)
                                              + over_gen_penalty_expr(self.model) + load_shed_penalty_expr(self.model)
                                              + ramp_down_penalty_expr(self.model) + ramp_up_penalty_expr(self.model)
                                              + if_max_penalty_expr(self.model) + if_min_penalty_expr(self.model)

@@ -3,7 +3,6 @@ data/solar
 data/onshore_wind
 data/offshore_wind
 data/buildings
-data/grid
 figures/
 results/
 .idea/

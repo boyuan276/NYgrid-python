@@ -316,7 +316,7 @@ class NYGrid:
 
         # Line flow limit in p.u.
         self.br_max = self.branch[:, RATE_A] / self.baseMVA
-        # Replace default value 0 to 999.99
+        # Replace default value 0 (Unlimited) to 999.99
         self.br_max[self.br_max == 0] = 999.99
         self.br_min = - self.br_max
 

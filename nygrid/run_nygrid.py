@@ -291,7 +291,7 @@ class NYGrid:
         self.NG = self.gen.shape[0]  # Number of generators
         self.NB = self.bus.shape[0]  # Number of buses
         self.NBR = self.branch.shape[0]  # Number of lines
-        self.NL = np.count_nonzero(self.bus[:, PD])  # Number of loads
+        self.NL = np.size(self.bus[:, PD])  # Number of loads
 
         # Get mapping from generator to bus
         self.gen_map = np.zeros((self.NB, self.NG))
@@ -354,7 +354,8 @@ class NYGrid:
         # Generator ramp rate limit in p.u./hour
         self.ramp_up = np.ones((self.NT, self.NG)) * self.gen[:, RAMP_30] * 2 / self.baseMVA
         # Downward ramp rate is the minimum of the upward ramp rate and the maximum generation limit
-        self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
+        # self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
+        self.ramp_down = self.ramp_up
 
         # Linear cost intercept coefficients in p.u.
         self.gencost_0 = np.ones((self.NT, self.NG)) * self.gencost[:, COST + 1]
@@ -410,7 +411,7 @@ class NYGrid:
         self.NoPowerBalanceViolation = False
         self.NoRampViolation = False
         self.PenaltyForOverGeneration = 1_500  # $/MWh
-        self.PenaltyForLoadShed = 5_000  # $/MWh
+        self.PenaltyForLoadShed = 20_000  # $/MWh
         self.PenaltyForRampViolation = 11_000  # $/MW
         # UC module
         self.PenaltyForMinTimeViolation = 1_000  # $/MWh, Not used
@@ -423,8 +424,8 @@ class NYGrid:
         # PF module
         self.NoPowerflowViolation = False
         self.HvdcHurdleCost = 0.10  # $/MWh, Not used
-        self.PenaltyForBranchMwViolation = 1_000  # $/MWh
-        self.PenaltyForInterfaceMWViolation = 1_000  # $/MWh
+        self.PenaltyForBranchMwViolation = 10_000  # $/MWh
+        self.PenaltyForInterfaceMWViolation = 10_000  # $/MWh
         self.MaxPhaseAngleDifference = 1.5  # Radians, Not used
         # ES module
         self.PenaltyForEnergyStorageViolation = 8_000  # $/MWh, Not used
@@ -527,11 +528,6 @@ class NYGrid:
             # Thermal generators: Use user-defined time series schedule
             self.gen_max[:, self.gen_idx_non_cvt] = gen_max_sch / self.baseMVA
 
-            # HVDC Proxy generators: Use default values from the PyPower case
-            # self.gen_max[:, self.dcline_idx_f] = np.ones(
-            #     (self.NT, self.NDCL)) * self.gen[self.dcline_idx_f, PMAX] / self.baseMVA
-            # self.gen_max[:, self.dcline_idx_t] = np.ones(
-            #     (self.NT, self.NDCL)) * self.gen[self.dcline_idx_t, PMAX] / self.baseMVA
         else:
             raise ValueError('No generation capacity profile is provided.')
 
@@ -557,11 +553,6 @@ class NYGrid:
             # Thermal generators: Use user-defined time series schedule
             self.gen_min[:, self.gen_idx_non_cvt] = gen_min_sch / self.baseMVA
 
-            # HVDC Proxy generators: Use default values from the PyPower case
-            # self.gen_min[:, self.dcline_idx_f] = np.ones(
-            #     (self.NT, self.NDCL)) * self.gen[self.dcline_idx_f, PMIN] / self.baseMVA
-            # self.gen_min[:, self.dcline_idx_t] = np.ones(
-            #     (self.NT, self.NDCL)) * self.gen[self.dcline_idx_t, PMIN] / self.baseMVA
         else:
             raise ValueError('No generation capacity profile is provided.')
 
@@ -585,6 +576,9 @@ class NYGrid:
         if interval == '30min':
             gen_ramp_sch = gen_ramp_sch * 2
             gen_ramp_sch = gen_ramp_sch[self.start_datetime:self.end_datetime].to_numpy()
+
+            # Convert default value 0 (Unlimited) to 1e6
+            gen_ramp_sch[gen_ramp_sch == 0] = 1e6
         else:
             raise ValueError('Only support 30min ramp rate profile.')
 
@@ -593,16 +587,12 @@ class NYGrid:
             # Thermal generators: Use user-defined time series schedule
             self.ramp_up[:, self.gen_idx_non_cvt] = gen_ramp_sch / self.baseMVA
 
-            # HVDC Proxy generators: Use default values from the PyPower case
-            # self.ramp_up[:, self.dcline_idx_f] = np.ones(
-            #     (self.NT, self.NDCL)) * self.gen[self.dcline_idx_f, RAMP_30] * 2 / self.baseMVA
-            # self.ramp_up[:, self.dcline_idx_t] = np.ones(
-            #     (self.NT, self.NDCL)) * self.gen[self.dcline_idx_t, RAMP_30] * 2 / self.baseMVA
         else:
             raise ValueError('No ramp rate profile is provided.')
 
         # Downward ramp rate is the minimum of the upward ramp rate and the maximum generation limit
-        self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
+        # self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
+        self.ramp_down = self.ramp_up
 
     def set_gen_cost_sch(self, gen_cost0_sch, gen_cost1_sch):
         """
@@ -629,11 +619,6 @@ class NYGrid:
             # Thermal generators: Use user-defined time series schedule
             self.gencost_0[:, self.gen_idx_non_cvt] = gen_cost0_sch
 
-            # HVDC Proxy generators: Use default values from the PyPower case
-            # self.gencost_0[:, self.dcline_idx_f] = np.ones(
-            #     (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_f, COST + 1]
-            # self.gencost_0[:, self.dcline_idx_t] = np.ones(
-            #     (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_t, COST + 1]
         else:
             raise ValueError('No generation cost profile is provided.')
 
@@ -642,13 +627,20 @@ class NYGrid:
             # Thermal generators: Use user-defined time series schedule
             self.gencost_1[:, self.gen_idx_non_cvt] = gen_cost1_sch * self.baseMVA
 
-            # HVDC Proxy generators: Use default values from the PyPower case
-            # self.gencost_1[:, self.dcline_idx_f] = np.ones(
-            #     (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_f, COST] * self.baseMVA
-            # self.gencost_1[:, self.dcline_idx_t] = np.ones(
-            #     (self.NT, self.NDCL)) * self.gencost[self.dcline_idx_t, COST] * self.baseMVA
         else:
             raise ValueError('No generation cost profile is provided.')
+
+    def relax_external_branch_lim(self):
+        """
+        Relax external branch flow limit to 999.99.
+
+        Returns
+        -------
+        None
+        """
+
+        self.br_max[self.br_max != 999.99] = 999.99
+        self.br_min[self.br_min != -999.99] = -999.99
 
     def set_gen_init_data(self, gen_init):
         """
@@ -661,6 +653,8 @@ class NYGrid:
         """
 
         if gen_init is not None and gen_init.size > 0:
+            # Convert to internal generator indexing
+            gen_init = pd.DataFrame(gen_init, index=self.gen_i2e).sort_index().to_numpy().squeeze()
             self.gen_init = gen_init / self.baseMVA
         else:
             Warning('No generator initial condition is provided.')
@@ -756,19 +750,19 @@ class NYGrid:
         """
 
         # Create dictionary to store results
-        vars = dict()
+        variables = dict()
 
         # Power generation
         results_pg = np.array(self.model.PG[:, :]()).reshape(self.NT, self.NG) * self.baseMVA
         gen_order = self.ppc_int['order']['gen']['e2i']
         results_pg = pd.DataFrame(results_pg, index=self.timestamp_list,
                                   columns=gen_order).sort_index(axis=1)
-        vars['PG'] = results_pg
+        variables['PG'] = results_pg
 
         # Branch power flow
         branch_pf = np.array(self.model.PF[:, :]()).reshape(self.NT, self.NBR) * self.baseMVA
         results_pf = pd.DataFrame(branch_pf, index=self.timestamp_list)
-        vars['PF'] = results_pf
+        variables['PF'] = results_pf
 
         # Interface flow
         if_flow = np.zeros((self.NT, self.NIF))
@@ -781,7 +775,7 @@ class NYGrid:
                 if_flow[t, n] = sum(br_dir[i] * branch_pf[t, br_idx[i] - 1]
                                     for i in range(len(br_idx)))
         results_if = pd.DataFrame(if_flow, index=self.timestamp_list)
-        vars['IF'] = results_if
+        variables['IF'] = results_if
 
         if not self.UsePTDF:
             # Bus phase angle
@@ -791,7 +785,7 @@ class NYGrid:
             # Convert negative numbers to 0-360
             results_va = np.where(results_va < 0, results_va + 360, results_va)
             results_va = pd.DataFrame(results_va, index=self.timestamp_list)
-            vars['VA'] = results_va
+            variables['VA'] = results_va
 
             # Bus locational marginal price (LMP)
             results_lmp = np.zeros((self.NT, self.NB))
@@ -799,13 +793,13 @@ class NYGrid:
                 for n in range(self.NB):
                     results_lmp[t, n] = np.abs(self.model.dual[self.model.c_pf[t, n]]) / self.baseMVA
             results_lmp = pd.DataFrame(results_lmp, index=self.timestamp_list)
-            vars['LMP'] = results_lmp
+            variables['LMP'] = results_lmp
 
         else:
             # Bus power injection
             results_pbus = np.array(self.model.PBUS[:, :]()).reshape(self.NT, self.NB) * self.baseMVA
             results_pbus = pd.DataFrame(results_pbus, index=self.timestamp_list)
-            vars['PBUS'] = results_pbus
+            variables['PBUS'] = results_pbus
 
             # Bus locational marginal price (LMP)
             results_lmp = np.zeros((self.NT, self.NB))
@@ -822,7 +816,7 @@ class NYGrid:
             #         sp_congestion_min[t, n] = np.abs(self.model.dual[self.model.c_br_min[t, n]]) / self.baseMVA
             #         results_lmp[t, n] = sp_energy[t] + sp_congestion_max[t, n] + sp_congestion_min[t, n]
             results_lmp = pd.DataFrame(results_lmp, index=self.timestamp_list)
-            vars['LMP'] = results_lmp
+            variables['LMP'] = results_lmp
 
         # Slack variables
         results_s_ramp_down = np.array(self.model.s_ramp_down[:, :]()).reshape(self.NT, self.NG) * self.baseMVA
@@ -887,7 +881,7 @@ class NYGrid:
         }
 
         # Combine results
-        results = {**vars, **slack_vars, **costs}
+        results = {**variables, **slack_vars, **costs}
 
         return results
 

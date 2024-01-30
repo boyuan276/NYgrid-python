@@ -21,7 +21,7 @@ def format_date(in_date):
 
     Returns
     -------
-    out_date : str
+    out_date : datetime.datetime
         Formatted date.
     """
     for fmt in ('%b %d %Y', '%B %d %Y', '%b %d, %Y', '%B %d, %Y',

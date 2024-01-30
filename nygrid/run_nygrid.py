@@ -7,6 +7,7 @@ Known Issues/Wishlist:
 3. Check dim of start/end datetime and load profile
 
 """
+import os.path
 
 import pyomo.environ as pyo
 from pyomo.opt import SolverStatus, TerminationCondition
@@ -46,6 +47,105 @@ def check_status(results):
         print(str(results.solver))
         raise RuntimeError("Something else is wrong!")
     return status
+
+
+def read_grid_data(grid_data_dir):
+    """
+    Read grid data from csv files.
+
+    Parameters
+    ----------
+    grid_data_dir: str
+        Path to the grid data directory.
+
+    Returns
+    -------
+    grid_data: dict
+        Dictionary of grid data.
+        Keys: bus_prop, gen_prop, gen_fuel, gencost_prop, branch_prop, if_lim_prop, if_map_prop, storage_prop
+        Values: pandas.DataFrame
+    """
+
+    # Read bus properties
+    filename = os.path.join(grid_data_dir, 'bus_prop.csv')
+    if os.path.exists(filename):
+        bus_prop = pd.read_csv(filename, index_col=0)
+    else:
+        raise ValueError('Bus properties file does not exist.')
+
+    # Read generator properties
+    filename = os.path.join(grid_data_dir, 'gen_prop.csv')
+    if os.path.exists(filename):
+        gen_prop = pd.read_csv(filename, index_col=0)
+    else:
+        raise ValueError('Generator properties file does not exist.')
+
+    # Read generator fuel type
+    filename = os.path.join(grid_data_dir, 'genfuel_prop.csv')
+    if os.path.exists(filename):
+        gen_fuel = pd.read_csv(filename, index_col=0)
+    else:
+        raise ValueError('Generator fuel type file does not exist.')
+
+    # Read generator cost properties
+    filename = os.path.join(grid_data_dir, 'gencost_prop.csv')
+    if os.path.exists(filename):
+        gencost_prop = pd.read_csv(filename, index_col=0)
+    else:
+        raise ValueError('Generator cost properties file does not exist.')
+
+    # Read AC line properties
+    filename = os.path.join(grid_data_dir, 'branch_prop.csv')
+    if os.path.exists(filename):
+        branch_prop = pd.read_csv(filename, index_col=0)
+        # Replace default 0 (unlimited) with 9999
+        branch_prop.loc[branch_prop['RATE_A'] == 0, 'RATE_A'] = 9999
+    else:
+        raise ValueError('AC line properties file does not exist.')
+
+    # Read interface properties
+    filename = os.path.join(grid_data_dir, 'if_lims_prop.csv')
+    if os.path.exists(filename):
+        if_lim_prop = pd.read_csv(filename, index_col=0)
+    else:
+        raise ValueError('Interface limit properties file does not exist.')
+
+    # Read interface mapping
+    filename = os.path.join(grid_data_dir, 'if_map_prop.csv')
+    if os.path.exists(filename):
+        if_map_prop = pd.read_csv(filename, index_col=0)
+    else:
+        raise ValueError('Interface mapping file does not exist.')
+
+    # Read storage properties (Optional)
+    filename = os.path.join(grid_data_dir, 'esr_prop.csv')
+    if os.path.exists(filename):
+        storage_prop = pd.read_csv(filename, index_col=0)
+    else:
+        Warning('No storage properties are provided.')
+        storage_prop = None
+
+    # Read DC line properties (Optional)
+    filename = os.path.join(grid_data_dir, 'dcline_prop.csv')
+    if os.path.isfile(filename):
+        dcline_prop = pd.read_csv(filename, index_col=0)
+    else:
+        Warning('No DC line properties are provided.')
+        dcline_prop = None
+
+    grid_data = {
+        'bus_prop': bus_prop,
+        'gen_prop': gen_prop,
+        'gen_fuel': gen_fuel,
+        'gencost_prop': gencost_prop,
+        'branch_prop': branch_prop,
+        'if_lim_prop': if_lim_prop,
+        'if_map_prop': if_map_prop,
+        'storage_prop': storage_prop,
+        'dcline_prop': dcline_prop
+    }
+
+    return grid_data
 
 
 def convert_dcline_2_gen(ppc, dcline_prop=None):
@@ -192,21 +292,30 @@ def convert_esr_2_gen(ppc, esr_prop=None):
     return ppc_esr, num_esr
 
 
+def convert_vre_2_gen(ppc, vre_prop=None):
+    # TODO: Add renewable generators to gen matrix
+    # TODO: Add renewable profile to genmax matrix
+    # TODO: Add renewable gentype to genfuel list
+    # TODO: Add renewable gencost to gencost matrix
+
+    pass
+
+
 class NYGrid:
     """
     Class for running the NYGrid model.
 
     """
 
-    def __init__(self, ppc_filename, start_datetime, end_datetime,
-                 dcline_prop=None, esr_prop=None, verbose=False):
+    def __init__(self, grid_data_dir, start_datetime, end_datetime,
+                 dcline_prop=None, esr_prop=None, vre_prop=None, verbose=False):
         """
         Initialize the NYGrid model.
 
         Parameters
         ----------
-        ppc_filename: str
-            Path to the PyPower case file.
+        grid_data_dir: str
+            Path to the grid data directory.
         start_datetime: str
             Start datetime of the simulation.
         end_datetime: str
@@ -220,7 +329,7 @@ class NYGrid:
         """
 
         # %% Load PyPower case
-        self.ppc = pp.loadcase(ppc_filename)
+        # self.ppc = pp.loadcase(ppc_filename)
 
         # %% Set the start and end datetime of the simulation
         self.start_datetime = start_datetime
@@ -242,21 +351,37 @@ class NYGrid:
 
         # %% Process PyPower case constant fields
         # Remove user functions
-        del self.ppc['userfcn']
+        # del self.ppc['userfcn']
 
         # Format genfuel and bus_name strings
-        self.ppc['genfuel'] = np.array([str(x[0][0]) for x in self.ppc['genfuel']])
-        self.ppc['bus_name'] = np.array([str(x[0][0]) for x in self.ppc['bus_name']])
+        # self.ppc['genfuel'] = np.array([str(x[0][0]) for x in self.ppc['genfuel']])
+        # self.ppc['bus_name'] = np.array([str(x[0][0]) for x in self.ppc['bus_name']])
 
         # Format interface limit data
-        self.ppc['if'] = {
-            'map': self.ppc['if'][0][0][0],
-            'lims': self.ppc['if'][0][0][1]
-        }
-        self.ppc = pp.toggle_iflims(self.ppc, 'on')
+        # self.ppc['if'] = {
+        #     'map': self.ppc['if'][0][0][0],
+        #     'lims': self.ppc['if'][0][0][1]
+        # }
+        # self.ppc = pp.toggle_iflims(self.ppc, 'on')
 
         # Convert baseMVA to float
-        self.ppc['baseMVA'] = float(self.ppc['baseMVA'])
+        # self.ppc['baseMVA'] = float(self.ppc['baseMVA'])
+
+        # %% Read grid data
+        self.grid_data = read_grid_data(grid_data_dir)
+
+        # %% Create PyPower case
+        self.ppc = dict()
+        self.ppc['baseMVA'] = 100
+        self.ppc['version'] = '2'
+        self.ppc['bus'] = self.grid_data['bus_prop'].drop(columns=['BUS_ZONE']).to_numpy()
+        self.ppc['gen'] = self.grid_data['gen_prop'].drop(columns=['GEN_NAME', 'GEN_ZONE', 'GEN_FUEL']).to_numpy()
+        self.ppc['genfuel'] = self.grid_data['gen_fuel'].to_numpy()
+        self.ppc['gencost'] = self.grid_data['gencost_prop'].to_numpy()
+        self.ppc['branch'] = self.grid_data['branch_prop'].drop(columns=['FROM_ZONE', 'TO_ZONE']).to_numpy()
+        self.ppc['dcline'] = self.grid_data['dcline_prop'].drop(columns=['FROM_ZONE', 'TO_ZONE']).to_numpy()
+        self.ppc['if'] = {'lims': self.grid_data['if_lim_prop'].drop(columns=['FROM_ZONE', 'TO_ZONE']).to_numpy(),
+                          'map': self.grid_data['if_map_prop'].drop(columns=['BR_IDX', 'BR_DIR']).to_numpy()}
 
         # Convert DC line to generators and add to gen matrix
         self.ppc_dc, self.NDCL = convert_dcline_2_gen(self.ppc, dcline_prop)
@@ -264,10 +389,8 @@ class NYGrid:
         # Convert ESR to generators and add to gen matrix
         self.ppc_dc_esr, self.NESR = convert_esr_2_gen(self.ppc_dc, esr_prop)
 
-        # TODO: Add renewable generators to gen matrix
-        # TODO: Add renewable profile to genmax matrix
-        # TODO: Add renewbale gentype to genfuel list
-        # TODO: Add renewable gencost to gencost matrix
+        # Convert renewable generators to generators and add to gen matrix
+        self.ppc_dc_esr_vre, self.NVRE = convert_vre_2_gen(self.ppc_dc_esr, vre_prop)
 
         # Convert to internal indexing
         self.ppc_int = pp.ext2int(self.ppc_dc_esr)
@@ -375,7 +498,6 @@ class NYGrid:
         # Add ESR properties
 
         if esr_prop is not None and esr_prop.size > 0:
-
             # ESR charging power upper limit in p.u.
             self.esr_crg_max = np.ones((self.NT, self.NESR)) * esr_prop[:, ESR_CRG_MAX] / self.baseMVA
 

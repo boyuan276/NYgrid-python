@@ -34,7 +34,7 @@ class Optimizer:
         self.loads = range(self.nygrid.NL)
         self.interfaces = range(self.nygrid.NIF)
         self.dclines = range(self.nygrid.NDCL)
-        self.esrs = range(self.nygrid.NESR)  # TODO: Define NESR
+        self.esrs = range(self.nygrid.NESR)
 
     def add_vars_ed(self):
         """

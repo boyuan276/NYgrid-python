@@ -70,8 +70,6 @@ def convert_dcline_2_gen(ppc, dcline_prop=None):
         ppc (dict): PyPower case dictionary.
     """
 
-    # TODO: Use dcline prop from an external file
-
     # Get PyPower case information
     ppc_dc = ppc.copy()
     baseMVA = ppc_dc['baseMVA']
@@ -266,6 +264,11 @@ class NYGrid:
         # Convert ESR to generators and add to gen matrix
         self.ppc_dc_esr, self.NESR = convert_esr_2_gen(self.ppc_dc, esr_prop)
 
+        # TODO: Add renewable generators to gen matrix
+        # TODO: Add renewable profile to genmax matrix
+        # TODO: Add renewbale gentype to genfuel list
+        # TODO: Add renewable gencost to gencost matrix
+
         # Convert to internal indexing
         self.ppc_int = pp.ext2int(self.ppc_dc_esr)
         # self.ppc_int = self.ppc_dc
@@ -281,7 +284,7 @@ class NYGrid:
 
         # Build B matrices and phase shift injections
         B, Bf, _, _ = pp.makeBdc(self.baseMVA, self.bus, self.branch)
-        self.B = B.todense()
+        self.B = B.todense
         self.Bf = Bf.todense()
 
         # Linear shift factor

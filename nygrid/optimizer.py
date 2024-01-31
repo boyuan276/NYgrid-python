@@ -11,11 +11,12 @@ class Optimizer:
 
         Parameters
         ----------
-        nygrid : nygrid.run_nygrid.NYGrid
+        nygrid : nygrid.nygrid.NYGrid
 
         Returns
         -------
-        None
+        Optimizer: nygrid.optimizer.Optimizer
+            OPF model.
         """
 
         # Define pyomo model
@@ -42,7 +43,8 @@ class Optimizer:
 
         Returns
         -------
-        None
+        Optimizer: nygrid.optimizer.Optimizer
+            OPF model.
         """
 
         # Generator real power output

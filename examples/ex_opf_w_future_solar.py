@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 
 from pyomo.opt import SolverFactory
 
-from nygrid.run_nygrid import NYGrid, check_status
+from nygrid.nygrid import NYGrid, check_status
 import pickle
 import time
 import logging

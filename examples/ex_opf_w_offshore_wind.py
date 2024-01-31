@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
-from nygrid.run_nygrid import NYGrid
+from nygrid.nygrid import NYGrid
 import pickle
 import time
 

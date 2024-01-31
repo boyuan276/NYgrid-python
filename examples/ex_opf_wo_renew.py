@@ -21,9 +21,11 @@ if __name__ == '__main__':
     # NOTE: Change the following settings to run the simulation
     sim_name = 'wo_renew'
     leading_hours = 12
+    w_cpny = False  # True: add CPNY and CHPE HVDC lines; False: no CPNY and CHPE HVDC lines
+    w_esr = False  # True: add ESRs; False: no ESRs
 
     start_date = datetime(2018, 1, 1, 0, 0, 0)
-    end_date = datetime(2018, 1, 10, 0, 0, 0)
+    end_date = datetime(2018, 12, 31, 0, 0, 0)
     timestamp_list = pd.date_range(start_date, end_date, freq='1D')
 
     # %% Set up logging
@@ -67,12 +69,24 @@ if __name__ == '__main__':
     # Read DC line property file
     filename = os.path.join(grid_data_dir, 'dcline_prop.csv')
     dcline_prop = pd.read_csv(filename, index_col=0)
-    grid_data['dcline_prop'] = dcline_prop
+
+    if w_cpny:
+        grid_data['dcline_prop'] = dcline_prop
+        logging.info('With CPNY and CHPE HVDC lines.')
+    else:
+        grid_data['dcline_prop'] = dcline_prop[4:]
+        logging.info('Without CPNY and CHPE HVDC lines.')
 
     # Read ESR property file
     filename = os.path.join(grid_data_dir, 'esr_prop.csv')
     esr_prop = pd.read_csv(filename, index_col=0)
-    grid_data['esr_prop'] = esr_prop
+
+    if w_esr:
+        logging.info('With ESRs.')
+        grid_data['esr_prop'] = esr_prop
+    else:
+        logging.info('No ESRs.')
+        grid_data['esr_prop'] = None
 
     # %% Set up OPF model
 
@@ -88,13 +102,12 @@ if __name__ == '__main__':
 
     # Loop through all days
     for d in range(len(timestamp_list) - 1):
-
         t = time.time()
 
         # Run OPF for one day (24 hours) plus leading hours
         # The first day is valid, the leading hours are used to dispatch batteries properly
         start_datetime = timestamp_list[d]
-        end_datetime = start_datetime + timedelta(hours=24+leading_hours)
+        end_datetime = start_datetime + timedelta(hours=24 + leading_hours)
 
         nygrid_results = run_nygrid_one_day(start_datetime, end_datetime, grid_data, grid_data_dir, options, last_gen)
 

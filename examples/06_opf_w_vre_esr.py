@@ -107,6 +107,8 @@ if __name__ == '__main__':
         vre_prop, genmax_profile_vre = read_vre_data(solar_data_dir, onshore_wind_data_dir, offshore_wind_data_dir)
         grid_data['vre_prop'] = vre_prop
         grid_data['genmax_profile_vre'] = genmax_profile_vre
+        # NOTE: Make datetime index consistent
+        grid_data['genmax_profile_vre'].index = grid_data['genmax_profile'].index
         logging.info('With future solar and offshore wind.')
     else:
         logging.info('No future solar and offshore wind.')

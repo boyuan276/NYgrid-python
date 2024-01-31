@@ -38,13 +38,13 @@ def check_status(results):
     if (results.solver.status == SolverStatus.ok) and (
             results.solver.termination_condition == TerminationCondition.optimal):
         status = True
-        print("The problem is feasible and optimal!")
+        logging.info("The problem is feasible and optimal!")
     elif results.solver.termination_condition == TerminationCondition.infeasible:
         status = False
         raise RuntimeError("The problem is infeasible!")
     else:
         status = False
-        print(str(results.solver))
+        logging.error(str(results.solver))
         raise RuntimeError("Something else is wrong!")
     return status
 
@@ -936,7 +936,7 @@ class NYGrid:
 
         # Check the status of the optimization problem
         if check_status(results):
-            print(f"Objective function value: {self.model.obj():.3e}")
+            logging.info(f"Objective function value: {self.model.obj():.3e}")
 
     def get_results_dc_opf(self):
         """
@@ -1092,16 +1092,16 @@ class NYGrid:
         """
         Show model dimensions.
         """
-        print('Number of buses: {}'.format(self.NB))
-        print('Number of generators: {}'.format(self.NG))
-        print('Number of branches: {}'.format(self.NBR))
-        print('Number of time periods: {}'.format(self.NT))
+        logging.info('Number of buses: {}'.format(self.NB))
+        logging.info('Number of generators: {}'.format(self.NG))
+        logging.info('Number of branches: {}'.format(self.NBR))
+        logging.info('Number of time periods: {}'.format(self.NT))
 
         num_vars = self.model.nvariables()
-        print('Number of variables: {}'.format(num_vars))
+        logging.info('Number of variables: {}'.format(num_vars))
 
         num_constraints = self.model.nconstraints()
-        print('Number of constraints: {}'.format(num_constraints))
+        logging.info('Number of constraints: {}'.format(num_constraints))
 
     def get_last_gen(self, model_multi_opf):
         """

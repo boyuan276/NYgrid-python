@@ -106,7 +106,7 @@ if __name__ == '__main__':
     last_gen = None
 
     # Loop through all days
-    for d in range(len(timestamp_list) - 1):
+    for d in range(len(timestamp_list)):
         t = time.time()
 
         # Run OPF for one day (24 hours) plus leading hours

@@ -267,7 +267,7 @@ def run_nygrid_one_day(s_time, e_time, grid_data, grid_data_dir, opts, init_gen)
     nygrid_sim.set_gen_ramp_sch(grid_data['genramp30_profile'])
     nygrid_sim.set_gen_cost_sch(grid_data['gencost0_profile'], grid_data['gencost1_profile'])
 
-    if grid_data['genmax_profile_vre'] is not None:
+    if grid_data.get('genmax_profile_vre', None) is not None:
         nygrid_sim.set_vre_max_sch(grid_data['genmax_profile_vre'])
 
     # Relax branch flow limits

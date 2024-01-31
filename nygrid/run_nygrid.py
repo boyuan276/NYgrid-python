@@ -158,7 +158,7 @@ def convert_dcline_2_gen(ppc, dcline_prop=None):
     ----------
     ppc: dict
         PyPower case dictionary.
-    dcline_prop: numpy.ndarray
+    dcline_prop: numpy.ndarray or pandas.DataFrame
         DC line properties.
 
     Returns
@@ -172,16 +172,19 @@ def convert_dcline_2_gen(ppc, dcline_prop=None):
 
     # Get PyPower case information
     ppc_dc = ppc.copy()
-    baseMVA = ppc_dc['baseMVA']
-    gen = ppc_dc['gen']
-    gencost = ppc_dc['gencost']
-    genfuel = ppc_dc['genfuel']
 
     if dcline_prop is not None and dcline_prop.size > 0:
         dcline = dcline_prop
     else:
         dcline = ppc_dc['dcline']
         Warning('No DC line properties are provided. Use default values from the PyPower case.')
+
+    if isinstance(dcline, pd.DataFrame):
+        dcline = dcline.to_numpy()
+    elif isinstance(dcline, np.ndarray):
+        pass
+    else:
+        raise ValueError('DC line properties must be a numpy.ndarray or pandas.DataFrame.')
 
     # Set gen parameters of the DC line converted generators
     num_dcline = dcline.shape[0]
@@ -198,7 +201,7 @@ def convert_dcline_2_gen(ppc, dcline_prop=None):
                                           dcline[:, DC_QMINT]])
     dcline_gen[:, VG] = np.concatenate([dcline[:, DC_VF],
                                         dcline[:, DC_VT]])
-    dcline_gen[:, MBASE] = np.ones(num_dcline * 2) * baseMVA
+    dcline_gen[:, MBASE] = np.ones(num_dcline * 2) * ppc['baseMVA']
     dcline_gen[:, GEN_STATUS] = np.concatenate([dcline[:, DC_BR_STATUS],
                                                 dcline[:, DC_BR_STATUS]])
     dcline_gen[:, PMAX] = np.concatenate([dcline[:, DC_PMAX],
@@ -209,19 +212,19 @@ def convert_dcline_2_gen(ppc, dcline_prop=None):
     dcline_gen[:, RAMP_10] = np.ones(num_dcline * 2) * 1e6  # Unlimited ramp rate
     dcline_gen[:, RAMP_30] = np.ones(num_dcline * 2) * 1e6  # Unlimited ramp rate
     # Add the DC line converted generators to the gen matrix
-    ppc_dc['gen'] = np.concatenate([gen, dcline_gen])
+    ppc_dc['gen'] = np.concatenate([ppc['gen'], dcline_gen])
 
     # Set gencost parameters of the DC line converted generators
     dcline_gencost = np.zeros((num_dcline * 2, 6))
     dcline_gencost[:, MODEL] = np.ones(num_dcline * 2) * POLYNOMIAL
     dcline_gencost[:, NCOST] = np.ones(num_dcline * 2) * 2
     # Add the DC line converted generators to the gencost matrix
-    ppc_dc['gencost'] = np.concatenate([gencost, dcline_gencost])
+    ppc_dc['gencost'] = np.concatenate([ppc['gencost'], dcline_gencost])
 
     # Add the DC line converted generators to the genfuel list
     dcline_genfuel = np.array(['DC Line From'] * num_dcline
-                              + ['DC Line To'] * num_dcline)
-    ppc_dc['genfuel'] = np.concatenate([genfuel, dcline_genfuel])
+                              + ['DC Line To'] * num_dcline).reshape(2*num_dcline, 1)
+    ppc_dc['genfuel'] = np.concatenate([ppc['genfuel'], dcline_genfuel])
 
     return ppc_dc, num_dcline
 
@@ -236,7 +239,7 @@ def convert_esr_2_gen(ppc, esr_prop=None):
     ----------
     ppc: dict
         PyPower case dictionary.
-    esr_prop: numpy.ndarray
+    esr_prop: numpy.ndarray or pandas.DataFrame
         ESR properties.
 
     Returns
@@ -249,14 +252,17 @@ def convert_esr_2_gen(ppc, esr_prop=None):
 
     # Get PyPower case information
     ppc_esr = ppc.copy()
-    baseMVA = ppc_esr['baseMVA']
-    gen = ppc_esr['gen']
-    gencost = ppc_esr['gencost']
-    genfuel = ppc_esr['genfuel']
 
     if esr_prop is None or esr_prop.size == 0:
         Warning('No ESR properties are provided.')
         return ppc_esr, 0
+
+    if isinstance(esr_prop, pd.DataFrame):
+        esr_prop = esr_prop.to_numpy()
+    elif isinstance(esr_prop, np.ndarray):
+        pass
+    else:
+        raise ValueError('ESR properties must be a numpy.ndarray or pandas.DataFrame.')
 
     # Set gen parameters of the ESR converted generators
     num_esr = esr_prop.shape[0]
@@ -267,7 +273,7 @@ def convert_esr_2_gen(ppc, esr_prop=None):
     esr_gen[:, QMAX] = np.zeros(num_esr)
     esr_gen[:, QMIN] = np.zeros(num_esr)
     esr_gen[:, VG] = np.ones(num_esr)
-    esr_gen[:, MBASE] = np.ones(num_esr) * baseMVA
+    esr_gen[:, MBASE] = np.ones(num_esr) * ppc['baseMVA']
     esr_gen[:, GEN_STATUS] = np.ones(num_esr)
     esr_gen[:, PMAX] = np.array(esr_prop[:, ESR_DIS_MAX])
     esr_gen[:, PMIN] = np.array(-1 * esr_prop[:, ESR_CRG_MAX])
@@ -275,30 +281,86 @@ def convert_esr_2_gen(ppc, esr_prop=None):
     esr_gen[:, RAMP_10] = np.ones(num_esr) * 1e6  # Unlimited ramp rate
     esr_gen[:, RAMP_30] = np.ones(num_esr) * 1e6  # Unlimited ramp rate
     # Add the ESR converted generators to the gen matrix
-    ppc_esr['gen'] = np.concatenate([gen, esr_gen])
+    ppc_esr['gen'] = np.concatenate([ppc['gen'], esr_gen])
 
     # Set gencost parameters of the ESR converted generators
-    # TODO: Add non-zero cost to prevent simultaneous charging and discharging
     esr_gencost = np.zeros((num_esr, 6))
     esr_gencost[:, MODEL] = np.ones(num_esr) * POLYNOMIAL
     esr_gencost[:, NCOST] = np.ones(num_esr) * 2
     # Add the ESR converted generators to the gencost matrix
-    ppc_esr['gencost'] = np.concatenate([gencost, esr_gencost])
+    ppc_esr['gencost'] = np.concatenate([ppc['gencost'], esr_gencost])
 
     # Add the ESR converted generators to the genfuel list
-    esr_genfuel = np.array(['ESR'] * num_esr)
-    ppc_esr['genfuel'] = np.concatenate([genfuel, esr_genfuel])
+    esr_genfuel = np.array(['ESR'] * num_esr).reshape(num_esr, 1)
+    ppc_esr['genfuel'] = np.concatenate([ppc['genfuel'], esr_genfuel])
 
     return ppc_esr, num_esr
 
 
 def convert_vre_2_gen(ppc, vre_prop=None):
-    # TODO: Add renewable generators to gen matrix
-    # TODO: Add renewable profile to genmax matrix
-    # TODO: Add renewable gentype to genfuel list
-    # TODO: Add renewable gencost to gencost matrix
+    """
+    Convert renewable generators to generators and add their parameters in the PyPower matrices.
 
-    pass
+    Parameters
+    ----------
+    ppc: dict
+        PyPower case dictionary.
+    vre_prop: numpy.ndarray or pandas.DataFrame
+        VRE properties.
+
+    Returns
+    -------
+    ppc_vre: dict
+        PyPower case dictionary with VRE converted to generators.
+    num_vre: int
+        Number of VRE.
+    """
+
+    # Get PyPower case information
+    ppc_vre = ppc.copy()
+
+    if vre_prop is None or vre_prop.size == 0:
+        Warning('No ESR properties are provided.')
+        return ppc_vre, 0
+
+    if isinstance(vre_prop, pd.DataFrame):
+        vre_prop = vre_prop.to_numpy()
+    elif isinstance(vre_prop, np.ndarray):
+        pass
+    else:
+        raise ValueError('VRE properties must be a numpy.ndarray or pandas.DataFrame.')
+
+    # Set gen parameters of the VRE converted generators
+    num_vre = vre_prop.shape[0]
+    vre_gen = np.zeros((num_vre, 21))  # One for charging, one for discharging
+    vre_gen[:, GEN_BUS] = np.array(vre_prop[:, VRE_BUS])
+    vre_gen[:, PG] = np.zeros(num_vre)
+    vre_gen[:, QG] = np.zeros(num_vre)
+    vre_gen[:, QMAX] = np.zeros(num_vre)
+    vre_gen[:, QMIN] = np.zeros(num_vre)
+    vre_gen[:, VG] = np.ones(num_vre)
+    vre_gen[:, MBASE] = np.ones(num_vre) * ppc['baseMVA']
+    vre_gen[:, GEN_STATUS] = np.ones(num_vre)
+    vre_gen[:, PMAX] = np.array(vre_prop[:, VRE_PMAX])
+    vre_gen[:, PMIN] = np.array(vre_prop[:, VRE_PMIN])
+    vre_gen[:, RAMP_AGC] = np.ones(num_vre) * 1e6  # Unlimited ramp rate
+    vre_gen[:, RAMP_10] = np.ones(num_vre) * 1e6  # Unlimited ramp rate
+    vre_gen[:, RAMP_30] = np.ones(num_vre) * 1e6  # Unlimited ramp rate
+    # Add the ESR converted generators to the gen matrix
+    ppc_vre['gen'] = np.concatenate([ppc['gen'], vre_gen])
+
+    # Set gencost parameters of the VRE converted generators
+    vre_gencost = np.zeros((num_vre, 6))
+    vre_gencost[:, MODEL] = np.ones(num_vre) * POLYNOMIAL
+    vre_gencost[:, NCOST] = np.ones(num_vre) * 2
+    # Add the ESR converted generators to the gencost matrix
+    ppc_vre['gencost'] = np.concatenate([ppc['gencost'], vre_gencost])
+
+    # Add the VRE converted generators to the genfuel list
+    vre_genfuel = np.array(vre_prop[:, VRE_TYPE]).reshape(num_vre, 1)
+    ppc_vre['genfuel'] = np.concatenate([ppc['genfuel'], vre_genfuel])
+
+    return ppc_vre, num_vre
 
 
 class NYGrid:
@@ -349,24 +411,6 @@ class NYGrid:
             logging.info(f'NYGrid run ending on: {self.end_datetime}')
             logging.info(f'NYGrid run duration: {self.delta_t}')
 
-        # %% Process PyPower case constant fields
-        # Remove user functions
-        # del self.ppc['userfcn']
-
-        # Format genfuel and bus_name strings
-        # self.ppc['genfuel'] = np.array([str(x[0][0]) for x in self.ppc['genfuel']])
-        # self.ppc['bus_name'] = np.array([str(x[0][0]) for x in self.ppc['bus_name']])
-
-        # Format interface limit data
-        # self.ppc['if'] = {
-        #     'map': self.ppc['if'][0][0][0],
-        #     'lims': self.ppc['if'][0][0][1]
-        # }
-        # self.ppc = pp.toggle_iflims(self.ppc, 'on')
-
-        # Convert baseMVA to float
-        # self.ppc['baseMVA'] = float(self.ppc['baseMVA'])
-
         # %% Read grid data
         self.grid_data = read_grid_data(grid_data_dir)
 
@@ -393,8 +437,7 @@ class NYGrid:
         self.ppc_dc_esr_vre, self.NVRE = convert_vre_2_gen(self.ppc_dc_esr, vre_prop)
 
         # Convert to internal indexing
-        self.ppc_int = pp.ext2int(self.ppc_dc_esr)
-        # self.ppc_int = self.ppc_dc
+        self.ppc_int = pp.ext2int(self.ppc_dc_esr_vre)
 
         self.baseMVA = self.ppc_int['baseMVA']
         self.bus = self.ppc_int['bus']
@@ -425,14 +468,19 @@ class NYGrid:
 
         # Get index of existing generators (not DC line or ESR converted)
         self.gen_i2e = self.ppc_int['order']['gen']['i2e']
-        self.gen_idx_non_cvt = self.gen_i2e[:self.NG - self.NDCL * 2 - self.NESR]
+        self.gen_idx_non_cvt = self.gen_i2e[:self.NG - self.NDCL*2 - self.NESR - self.NVRE]
 
         # Get index of DC line converted generators in internal indexing
-        self.dcline_idx_f = self.gen_i2e[self.NG - self.NDCL * 2 - self.NESR: self.NG - self.NDCL - self.NESR]
-        self.dcline_idx_t = self.gen_i2e[self.NG - self.NDCL - self.NESR: self.NG - self.NESR]
+        self.dcline_idx_f = self.gen_i2e[self.NG - self.NDCL*2 - self.NESR - self.NVRE:
+                                         self.NG - self.NDCL - self.NESR - self.NVRE]
+        self.dcline_idx_t = self.gen_i2e[self.NG - self.NDCL - self.NESR - self.NVRE:
+                                         self.NG - self.NESR - self.NVRE]
 
         # Get index of ESR converted generators in internal indexing
-        self.esr_idx = self.gen_i2e[self.NG - self.NESR: self.NG]
+        self.esr_idx = self.gen_i2e[self.NG - self.NESR - self.NVRE: self.NG - self.NVRE]
+
+        # Get index of VRE converted generators in internal indexing
+        self.vre_idx = self.gen_i2e[self.NG - self.NVRE: self.NG]
 
         # Get mapping from load to bus
         self.load_map = np.zeros((self.NB, self.NL))
@@ -450,8 +498,6 @@ class NYGrid:
         self.if_map = self.ppc_int['if']['map']
         self.if_lims = self.ppc_int['if']['lims']
         self.if_lims[:, 1:] = self.if_lims[:, 1:] / self.baseMVA
-        br_dir, br_idx = np.sign(self.if_map[:, 1]), np.abs(self.if_map[:, 1]).astype(int)
-        self.if_map[:, 1] = br_dir * (br_idx - 1)
         self.NIF = len(self.if_lims)
 
         self.if_br_dir = np.empty(self.NIF, dtype=object)
@@ -496,8 +542,15 @@ class NYGrid:
         self.gen_init = None
 
         # Add ESR properties
-
         if esr_prop is not None and esr_prop.size > 0:
+
+            if isinstance(esr_prop, pd.DataFrame):
+                esr_prop = esr_prop.to_numpy()
+            elif isinstance(esr_prop, np.ndarray):
+                pass
+            else:
+                raise ValueError('ESR properties must be a numpy.ndarray or pandas.DataFrame.')
+
             # ESR charging power upper limit in p.u.
             self.esr_crg_max = np.ones((self.NT, self.NESR)) * esr_prop[:, ESR_CRG_MAX] / self.baseMVA
 
@@ -655,6 +708,31 @@ class NYGrid:
 
         else:
             raise ValueError('No generation capacity profile is provided.')
+
+    def set_vre_max_sch(self, vre_max_sch):
+        """
+        Set VRE upper operating limit data from generation capacity profile.
+
+        Parameters
+        ----------
+        vre_max_sch: pandas.DataFrame
+            VRE upper operating limit profile of thermal generators.
+
+        Returns
+        -------
+        None
+        """
+
+        # Slice the generator profile to the simulation period
+        vre_max_sch = vre_max_sch[self.start_datetime:self.end_datetime].to_numpy()
+
+        # Generator upper operating limit in p.u.
+        if vre_max_sch is not None and vre_max_sch.size > 0:
+            # Thermal generators: Use user-defined time series schedule
+            self.gen_max[:, self.vre_idx] = vre_max_sch / self.baseMVA
+
+        else:
+            raise ValueError('No VRE generation capacity profile is provided.')
 
     def set_gen_min_sch(self, gen_min_sch):
         """

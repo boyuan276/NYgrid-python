@@ -20,6 +20,7 @@ if __name__ == '__main__':
     # %% Simulation settings
     # NOTE: Change the following settings to run the simulation
     sim_name = 'wo_renew'
+    leading_hours = 12
 
     start_date = datetime(2018, 1, 1, 0, 0, 0)
     end_date = datetime(2018, 1, 10, 0, 0, 0)
@@ -31,8 +32,8 @@ if __name__ == '__main__':
                         handlers=[logging.FileHandler(f'ex_opf_{sim_name}.log'),
                                   logging.StreamHandler()])
 
-    t = time.time()
-    logging.info('Start running multi-period OPF without renewable generators.')
+    prog_start = time.time()
+    logging.info(f'Start running multi-period OPF simulation {sim_name}.')
 
     # %% Set up directories
     cwd = os.getcwd()
@@ -87,10 +88,13 @@ if __name__ == '__main__':
 
     # Loop through all days
     for d in range(len(timestamp_list) - 1):
-        # Run OPF for two days at each iteration
-        # The first day is valid, the second day is used for creating initial condition for the next iteration
+
+        t = time.time()
+
+        # Run OPF for one day (24 hours) plus leading hours
+        # The first day is valid, the leading hours are used to dispatch batteries properly
         start_datetime = timestamp_list[d]
-        end_datetime = start_datetime + timedelta(hours=47)
+        end_datetime = start_datetime + timedelta(hours=24+leading_hours)
 
         nygrid_results = run_nygrid_one_day(start_datetime, end_datetime, grid_data, grid_data_dir, options, last_gen)
 
@@ -106,3 +110,6 @@ if __name__ == '__main__':
         elapsed = time.time() - t
         logging.info(f'Finished running for {start_datetime.strftime("%Y-%m-%d")}. Elapsed time: {elapsed:.2f} seconds')
         logging.info('-' * 80)
+
+    tot_elapsed = time.time() - prog_start
+    logging.info(f"Finished multi-period OPF simulation {sim_name}. Total elapsed time: {tot_elapsed:.2f} seconds")

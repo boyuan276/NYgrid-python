@@ -1,7 +1,10 @@
 """
-Run multi-period OPF with 2018 data
-without renewable generators
-
+Run multi-period OPF with 2018 data.
+1. Baseline case:
+No CPNY and CHPE HVDC lines.
+No ESRs.
+No future solar and offshore wind.
+No residential building electrification.
 """
 # %% Packages
 
@@ -19,10 +22,12 @@ if __name__ == '__main__':
 
     # %% Simulation settings
     # NOTE: Change the following settings to run the simulation
-    sim_name = 'wo_renew'
+    sim_name = 'baseline'
     leading_hours = 12
     w_cpny = False  # True: add CPNY and CHPE HVDC lines; False: no CPNY and CHPE HVDC lines
     w_esr = False  # True: add ESRs; False: no ESRs
+    w_vre = False  # True: add future solar and offshore wind; False: no future solar and offshore wind
+    w_elec = False  # True: add residential building electrification; False: no residential building electrification
 
     start_date = datetime(2018, 1, 1, 0, 0, 0)
     end_date = datetime(2018, 12, 31, 0, 0, 0)
@@ -72,9 +77,9 @@ if __name__ == '__main__':
 
     if w_cpny:
         grid_data['dcline_prop'] = dcline_prop
-        logging.info('With CPNY and CHPE HVDC lines.')
+        logging.info('With CPNY and CHPE HVDC lines.')  # Existing and planned HVDC lines
     else:
-        grid_data['dcline_prop'] = dcline_prop[4:]
+        grid_data['dcline_prop'] = dcline_prop[:4]  # Only existing HVDC lines
         logging.info('Without CPNY and CHPE HVDC lines.')
 
     # Read ESR property file
@@ -83,10 +88,10 @@ if __name__ == '__main__':
 
     if w_esr:
         logging.info('With ESRs.')
-        grid_data['esr_prop'] = esr_prop
+        grid_data['esr_prop'] = esr_prop  # Existing and planned ESRs
     else:
         logging.info('No ESRs.')
-        grid_data['esr_prop'] = None
+        grid_data['esr_prop'] = esr_prop[:8]  # Only existing ESRs
 
     # %% Set up OPF model
 

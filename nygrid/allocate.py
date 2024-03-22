@@ -9,12 +9,13 @@ https://autogis-site.readthedocs.io/en/2019/notebooks/L3/nearest-neighbor-faster
 from sklearn.neighbors import BallTree
 import numpy as np
 
-def get_nearest(src_points, candidates, k_neighbors=1, metric='minkowski'):
+
+def get_nearest(src_points, candidates, k_neighbors=1, metric='minkowski', leaf_size=20):
     """Find nearest neighbors for all source points from a set of candidate points"""
 
     # Create tree from the candidate points
     # tree = BallTree(candidates, leaf_size=20, metric='haversine')
-    tree = BallTree(candidates, leaf_size=20, metric=metric)
+    tree = BallTree(candidates, leaf_size=leaf_size, metric=metric)
     # Find closest points and distances
     distances, indices = tree.query(src_points, k=k_neighbors)
 
@@ -28,84 +29,86 @@ def get_nearest(src_points, candidates, k_neighbors=1, metric='minkowski'):
     closest_dist = distances[0]
 
     # Return indices and distances
-    return (closest, closest_dist)
+    return closest, closest_dist
 
 
-def nearest_neighbor_lat_lon(left_gdf, right_gdf, return_dist=False):
+def nearest_neighbor_lat_lon(left_gdf, right_gdf, return_dist=False, leaf_size=20):
     """
     For each point in left_gdf, find closest point in right GeoDataFrame and return them.
     
     NOTICE: Assumes that the input Points are in WGS84 projection (lat/lon).
     """
-    
+
     left_geom_col = left_gdf.geometry.name
     right_geom_col = right_gdf.geometry.name
-    
+
     # Ensure that index in right gdf is formed of sequential numbers
     right = right_gdf.copy().reset_index(drop=True)
-    
+
     # Parse coordinates from points and insert them into a numpy array as RADIANS
-    left_radians = np.array(left_gdf[left_geom_col].apply(lambda geom: (geom.x * np.pi / 180, geom.y * np.pi / 180)).to_list())
-    right_radians = np.array(right[right_geom_col].apply(lambda geom: (geom.x * np.pi / 180, geom.y * np.pi / 180)).to_list())
-    
+    left_radians = np.array(
+        left_gdf[left_geom_col].apply(lambda geom: (geom.x * np.pi / 180, geom.y * np.pi / 180)).to_list())
+    right_radians = np.array(
+        right[right_geom_col].apply(lambda geom: (geom.x * np.pi / 180, geom.y * np.pi / 180)).to_list())
+
     # Find the nearest points
     # -----------------------
     # closest ==> index in right_gdf that corresponds to the closest point
     # dist ==> distance between the nearest neighbors (in meters)
-    
+
     closest, dist = get_nearest(src_points=left_radians, candidates=right_radians,
-                                metric='haversine')
+                                metric='haversine', leaf_size=leaf_size)
 
     # Return points from right GeoDataFrame that are closest to points in left GeoDataFrame
     closest_points = right.loc[closest]
-    
+
     # Ensure that the index corresponds the one in left_gdf
     closest_points = closest_points.reset_index(drop=True)
-    
+
     # Add distance if requested 
     if return_dist:
         # Convert to meters from radians
         earth_radius = 6371000  # meters
         closest_points['distance'] = dist * earth_radius
-        
+
     return closest_points
 
-def nearest_neighbor_meters(left_gdf, right_gdf, return_dist=False):
+
+def nearest_neighbor_meters(left_gdf, right_gdf, return_dist=False, leaf_size=20):
     """
     For each point in left_gdf, find closest point in right GeoDataFrame and return them.
     
     NOTICE: Assumes that the input Points are in WGS84 projection (meters).
     """
-    
+
     left_geom_col = left_gdf.geometry.name
     right_geom_col = right_gdf.geometry.name
-    
+
     # Ensure that index in right gdf is formed of sequential numbers
     right = right_gdf.copy().reset_index(drop=True)
-    
+
     # Parse coordinates from points and insert them into a numpy array as METERS   
     left_meters = np.array(left_gdf[left_geom_col].apply(lambda geom: (geom.x, geom.y)).to_list())
     right_meters = np.array(right[right_geom_col].apply(lambda geom: (geom.x, geom.y)).to_list())
-
 
     # Find the nearest points
     # -----------------------
     # closest ==> index in right_gdf that corresponds to the closest point
     # dist ==> distance between the nearest neighbors (in meters)
-    
-    closest, dist = get_nearest(src_points=left_meters, candidates=right_meters)
+
+    closest, dist = get_nearest(src_points=left_meters, candidates=right_meters, leaf_size=leaf_size)
 
     # Return points from right GeoDataFrame that are closest to points in left GeoDataFrame
     closest_points = right.loc[closest]
-    
+
     # Ensure that the index corresponds the one in left_gdf
     closest_points = closest_points.reset_index(drop=True)
-    
+
     # Add distance if requested 
     if return_dist:
         # Convert to meters from radians
         # earth_radius = 6371000  # meters
         # closest_points['distance'] = dist * earth_radius
         closest_points['distance'] = dist
-        
+
     return closest_points

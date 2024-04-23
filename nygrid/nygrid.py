@@ -13,6 +13,7 @@ import os.path
 import numpy as np
 import pandas as pd
 import pyomo.environ as pyo
+import pyomo.opt.results.results_
 import pypower.api as pp
 from pyomo.opt import SolverStatus, TerminationCondition
 
@@ -20,8 +21,10 @@ from nygrid.optimizer import Optimizer
 from nygrid.ppc_idx import *
 from nygrid.utlis import format_date
 
+from typing import Union, Dict, Tuple
 
-def check_status(results):
+
+def check_status(results: pyomo.opt.results.results_.SolverResults) -> bool:
     """
     Check the status of a Pyomo model.
 
@@ -47,7 +50,7 @@ def check_status(results):
     return True
 
 
-def read_grid_data(grid_data_dir):
+def read_grid_data(grid_data_dir: Union[str, os.PathLike]) -> Dict[str, pd.DataFrame]:
     """
     Read grid data from csv files.
 
@@ -146,7 +149,8 @@ def read_grid_data(grid_data_dir):
     return grid_data
 
 
-def convert_dcline_2_gen(ppc, dcline_prop=None):
+def convert_dcline_2_gen(ppc: Dict[str, np.ndarray],
+                         dcline_prop: Union[np.ndarray, pd.DataFrame] = None) -> Tuple[Dict[str, np.ndarray], int]:
     """
     Convert DC lines to generators and add their parameters in the PyPower matrices.
     For each DC line, add two injectors: one at FROM bus and another at TO bus.
@@ -227,7 +231,8 @@ def convert_dcline_2_gen(ppc, dcline_prop=None):
     return ppc_dc, num_dcline
 
 
-def convert_esr_2_gen(ppc, esr_prop=None):
+def convert_esr_2_gen(ppc: Dict[str, np.ndarray],
+                      esr_prop: Union[np.ndarray, pd.DataFrame] = None) -> Tuple[Dict[str, np.ndarray], int]:
     """
     Convert ESR to generators and add their parameters in the PyPower matrices.
     For each ESR, add one injector to represent the combined injection of the ESR.
@@ -295,7 +300,8 @@ def convert_esr_2_gen(ppc, esr_prop=None):
     return ppc_esr, num_esr
 
 
-def convert_vre_2_gen(ppc, vre_prop=None):
+def convert_vre_2_gen(ppc: Dict[str, np.ndarray],
+                      vre_prop: Union[np.ndarray, pd.DataFrame] = None) -> Tuple[Dict[str, np.ndarray], int]:
     """
     Convert renewable generators to generators and add their parameters in the PyPower matrices.
 
@@ -367,8 +373,14 @@ class NYGrid:
 
     """
 
-    def __init__(self, grid_data_dir, start_datetime, end_datetime,
-                 dcline_prop=None, esr_prop=None, vre_prop=None, verbose=False):
+    def __init__(self,
+                 grid_data_dir: Union[str, os.PathLike],
+                 start_datetime: str,
+                 end_datetime: str,
+                 dcline_prop: Union[np.ndarray, pd.DataFrame] = None,
+                 esr_prop: Union[np.ndarray, pd.DataFrame] = None,
+                 vre_prop: Union[np.ndarray, pd.DataFrame] = None,
+                 verbose: bool = False) -> None:
         """
         Initialize the NYGrid model.
 
@@ -612,7 +624,7 @@ class NYGrid:
         self.UsePTDF = True
         self.solver = 'gurobi'
 
-    def set_options(self, options):
+    def set_options(self, options: Dict[str, Union[int, float]]) -> None:
         """
         Set solver options and penalty parameters.
 
@@ -631,7 +643,7 @@ class NYGrid:
             if self.verbose:
                 logging.info(f'Set {key} to {value} ...')
 
-    def set_load_sch(self, load_sch):
+    def set_load_sch(self, load_sch: pd.DataFrame) -> None:
         """
         Set load schedule data from load profile.
 
@@ -654,7 +666,7 @@ class NYGrid:
         else:
             raise ValueError('No load profile is provided.')
 
-    def set_gen_mw_sch(self, gen_mw_sch):
+    def set_gen_mw_sch(self, gen_mw_sch: pd.DataFrame) -> None:
         """
         Set generator schedule data from generation profile.
 
@@ -684,7 +696,7 @@ class NYGrid:
         else:
             raise ValueError('No generation profile is provided.')
 
-    def set_gen_max_sch(self, gen_max_sch):
+    def set_gen_max_sch(self, gen_max_sch: pd.DataFrame) -> None:
         """
         Set generator upper operating limit data from generation capacity profile.
 
@@ -709,7 +721,7 @@ class NYGrid:
         else:
             raise ValueError('No generation capacity profile is provided.')
 
-    def set_vre_max_sch(self, vre_max_sch):
+    def set_vre_max_sch(self, vre_max_sch: pd.DataFrame) -> None:
         """
         Set VRE upper operating limit data from generation capacity profile.
 
@@ -734,7 +746,7 @@ class NYGrid:
         else:
             raise ValueError('No VRE generation capacity profile is provided.')
 
-    def set_gen_min_sch(self, gen_min_sch):
+    def set_gen_min_sch(self, gen_min_sch: pd.DataFrame) -> None:
         """
         Set generator lower operating limit data from generation capacity profile.
 
@@ -759,7 +771,8 @@ class NYGrid:
         else:
             raise ValueError('No generation capacity profile is provided.')
 
-    def set_gen_ramp_sch(self, gen_ramp_sch, interval='30min'):
+    def set_gen_ramp_sch(self, gen_ramp_sch: pd.DataFrame,
+                         interval: str = '30min') -> None:
         """
         Set generator ramp rate limit data from ramp rate profile.
 
@@ -797,7 +810,8 @@ class NYGrid:
         # self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
         self.ramp_down = self.ramp_up
 
-    def set_gen_cost_sch(self, gen_cost0_sch, gen_cost1_sch):
+    def set_gen_cost_sch(self, gen_cost0_sch: pd.DataFrame,
+                         gen_cost1_sch: pd.DataFrame) -> None:
         """
         Set generator cost data from generation cost profile.
 
@@ -845,7 +859,7 @@ class NYGrid:
         self.br_max[self.br_max != 999.99] = 999.99
         self.br_min[self.br_min != -999.99] = -999.99
 
-    def set_gen_init_data(self, gen_init):
+    def set_gen_init_data(self, gen_init: np.ndarray) -> None:
         """
         Get generator initial condition.
 
@@ -862,7 +876,7 @@ class NYGrid:
         else:
             Warning('No generator initial condition is provided.')
 
-    def check_input_dim(self):
+    def check_input_dim(self) -> None:
         """
         Check the dimensions of the input data.
 
@@ -877,7 +891,7 @@ class NYGrid:
         if self.br_min.shape != self.br_max.shape:
             raise ValueError('Found mismatch in branch flow limit array dimensions!')
 
-    def create_dc_opf(self):
+    def create_dc_opf(self) -> None:
         """
         Create a multi-period DC OPF problem.
 
@@ -913,7 +927,19 @@ class NYGrid:
 
         self.model = optimizer.model
 
-    def solve_dc_opf(self, solver_options=None):
+    def solve_dc_opf(self, solver_options: Dict[str, Union[int, float]] = None) -> None:
+        """
+        Solve a multi-period DC OPF problem.
+
+        Parameters
+        ----------
+        solver_options: dict
+            Solver options.
+
+        Returns
+        -------
+        None
+        """
 
         # Create Pyomo model
         self.model = pyo.ConcreteModel(name='multi-period DC OPF')
@@ -938,7 +964,7 @@ class NYGrid:
         if check_status(results):
             logging.info(f"Objective function value: {self.model.obj():.3e}")
 
-    def get_results_dc_opf(self):
+    def get_results_dc_opf(self) -> Dict[str, pd.DataFrame]:
         """
         Get results for a multi-period OPF problem.
 
@@ -1088,7 +1114,7 @@ class NYGrid:
 
         return results
 
-    def show_model_dim(self):
+    def show_model_dim(self) -> None:
         """
         Show model dimensions.
         """
@@ -1103,7 +1129,7 @@ class NYGrid:
         num_constraints = self.model.nconstraints()
         logging.info('Number of constraints: {}'.format(num_constraints))
 
-    def get_last_gen(self, model_multi_opf):
+    def get_last_gen(self, model_multi_opf: pyo.ConcreteModel) -> np.ndarray:
         """
         Get generator power generation at the last simulation.
         Used to create initial condition for the next simulation.

@@ -10,7 +10,7 @@ import pandas as pd
 import string
 
 
-def format_date(in_date):
+def format_date(in_date: str) -> datetime.datetime:
     """
     Formats an input date so that it can be correctly written to the namelist.
 

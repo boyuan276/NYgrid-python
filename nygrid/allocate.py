@@ -8,15 +8,41 @@ https://autogis-site.readthedocs.io/en/2019/notebooks/L3/nearest-neighbor-faster
 
 from sklearn.neighbors import BallTree
 import numpy as np
+import geopandas as gpd
+from typing import Union, Tuple, Dict
 
 
-def get_nearest(src_points, candidates, k_neighbors=1, metric='minkowski', leaf_size=20):
-    """Find nearest neighbors for all source points from a set of candidate points"""
+def get_nearest(src_points: np.array,
+                candidates: np.array,
+                k_neighbors: int = 1,
+                metric: str = 'minkowski',
+                leaf_size: int = 20) -> Tuple[np.array, np.array]:
+    """
+    Find nearest neighbors for all source points from a set of candidate points
+
+    Parameters
+    ----------
+    src_points : np.ndarray
+        A numpy array of shape (n, 2) representing the source points.
+    candidates : np.ndarray
+        A numpy array of shape (m, 2) representing the candidate points.
+    k_neighbors : int
+        Number of nearest neighbors to return.
+    metric : str
+        The distance metric to use. Default is 'minkowski'.
+    leaf_size : int
+        Leaf size passed to BallTree. Default is 20.
+
+    Returns
+    -------
+    Tuple[np.ndarray, np.ndarray]
+        The indices of the k-nearest neighbors in the candidates array and the corresponding distances.
+    """
 
     # Create tree from the candidate points
-    # tree = BallTree(candidates, leaf_size=20, metric='haversine')
     tree = BallTree(candidates, leaf_size=leaf_size, metric=metric)
-    # Find closest points and distances
+
+    # Find the closest points and distances
     distances, indices = tree.query(src_points, k=k_neighbors)
 
     # Transpose to get distances and indices into arrays
@@ -32,11 +58,30 @@ def get_nearest(src_points, candidates, k_neighbors=1, metric='minkowski', leaf_
     return closest, closest_dist
 
 
-def nearest_neighbor_lat_lon(left_gdf, right_gdf, return_dist=False, leaf_size=20):
+def nearest_neighbor_lat_lon(left_gdf: gpd.GeoDataFrame,
+                             right_gdf: gpd.GeoDataFrame,
+                             return_dist: bool = False,
+                             leaf_size: int = 20) -> Union[Dict, Tuple]:
     """
     For each point in left_gdf, find closest point in right GeoDataFrame and return them.
     
     NOTICE: Assumes that the input Points are in WGS84 projection (lat/lon).
+
+    Parameters
+    ----------
+    left_gdf : gpd.GeoDataFrame
+        A GeoDataFrame containing the origin points.
+    right_gdf : gpd.GeoDataFrame
+        A GeoDataFrame containing the candidate destination points.
+    return_dist : bool
+        If True, the distance between the nearest neighbors is returned.
+    leaf_size : int
+        Leaf size passed to BallTree. Default is 20.
+
+    Returns
+    -------
+    closest_points: Union[Dict, Tuple]
+        A dictionary or tuple containing the closest points and distances (if requested).
     """
 
     left_geom_col = left_gdf.geometry.name
@@ -74,11 +119,30 @@ def nearest_neighbor_lat_lon(left_gdf, right_gdf, return_dist=False, leaf_size=2
     return closest_points
 
 
-def nearest_neighbor_meters(left_gdf, right_gdf, return_dist=False, leaf_size=20):
+def nearest_neighbor_meters(left_gdf: gpd.GeoDataFrame,
+                            right_gdf: gpd.GeoDataFrame,
+                            return_dist: bool = False,
+                            leaf_size: int = 20) -> Union[Dict, Tuple]:
     """
-    For each point in left_gdf, find closest point in right GeoDataFrame and return them.
+    For each point in left_gdf, find the closest point in right GeoDataFrame and return them.
     
     NOTICE: Assumes that the input Points are in WGS84 projection (meters).
+
+    Parameters
+    ----------
+    left_gdf : gpd.GeoDataFrame
+        A GeoDataFrame containing the origin points.
+    right_gdf : gpd.GeoDataFrame
+        A GeoDataFrame containing the candidate destination points.
+    return_dist : bool
+        If True, the distance between the nearest neighbors is returned.
+    leaf_size : int
+        Leaf size passed to BallTree. Default is 20.
+
+    Returns
+    -------
+    closest_points: Union[Dict, Tuple]
+        A dictionary or tuple containing the closest points and distances (if requested).
     """
 
     left_geom_col = left_gdf.geometry.name

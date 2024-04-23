@@ -3,9 +3,11 @@ import numpy as np
 import pandas as pd
 import pickle
 from nygrid.nygrid import NYGrid
+from typing import Union, Dict, Tuple, Any
 
 
-def read_grid_data(data_dir, year):
+def read_grid_data(data_dir: Union[str, os.PathLike],
+                   year: int) -> Dict[str, pd.DataFrame]:
     """
     Read grid data
 
@@ -64,7 +66,9 @@ def read_grid_data(data_dir, year):
     return grid_data
 
 
-def read_vre_data(solar_data_dir, onshore_wind_data_dir, offshore_wind_data_dir):
+def read_vre_data(solar_data_dir: Union[str, os.PathLike],
+                  onshore_wind_data_dir: Union[str, os.PathLike],
+                  offshore_wind_data_dir: Union[str, os.PathLike]) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
 
     Parameters
@@ -171,7 +175,7 @@ def read_vre_data(solar_data_dir, onshore_wind_data_dir, offshore_wind_data_dir)
     return vre_prop, genmax_profile_vre
 
 
-def read_electrification_data(buildings_data_dir):
+def read_electrification_data(buildings_data_dir: Union[str, os.PathLike]) -> pd.DataFrame:
     """
 
     Parameters
@@ -226,7 +230,12 @@ def read_electrification_data(buildings_data_dir):
     return res_load_change_bus
 
 
-def run_nygrid_one_day(s_time, e_time, grid_data, grid_data_dir, opts, init_gen):
+def run_nygrid_one_day(s_time: pd.Timestamp,
+                       e_time: pd.Timestamp,
+                       grid_data: Dict[str, pd.DataFrame],
+                       grid_data_dir: Union[str, os.PathLike],
+                       opts: Dict[str, Any],
+                       init_gen: np.ndarray) -> Dict[str, pd.DataFrame]:
     """
     Run NYGrid simulation for one day
 

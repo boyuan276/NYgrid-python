@@ -21,7 +21,7 @@ from nygrid.optimizer import Optimizer
 from nygrid.ppc_idx import *
 from nygrid.utlis import format_date
 
-from typing import Union, Dict, Tuple
+from typing import Optional, Union, Dict, Tuple
 
 
 def check_status(results: SolverResults) -> bool:
@@ -150,7 +150,8 @@ def read_grid_data(grid_data_dir: Union[str, os.PathLike]) -> Dict[str, pd.DataF
 
 
 def convert_dcline_2_gen(ppc: Dict[str, np.ndarray],
-                         dcline_prop: Union[np.ndarray, pd.DataFrame, None] = None) -> Tuple[Dict[str, np.ndarray], int]:
+                         dcline_prop: Optional[Union[np.ndarray, pd.DataFrame]] = None
+                         ) -> Tuple[Dict[str, np.ndarray], int]:
     """
     Convert DC lines to generators and add their parameters in the PyPower matrices.
     For each DC line, add two injectors: one at FROM bus and another at TO bus.
@@ -232,7 +233,8 @@ def convert_dcline_2_gen(ppc: Dict[str, np.ndarray],
 
 
 def convert_esr_2_gen(ppc: Dict[str, np.ndarray],
-                      esr_prop: Union[np.ndarray, pd.DataFrame, None] = None) -> Tuple[Dict[str, np.ndarray], int]:
+                      esr_prop: Optional[Union[np.ndarray, pd.DataFrame]] = None
+                      ) -> Tuple[Dict[str, np.ndarray], int]:
     """
     Convert ESR to generators and add their parameters in the PyPower matrices.
     For each ESR, add one injector to represent the combined injection of the ESR.
@@ -301,7 +303,8 @@ def convert_esr_2_gen(ppc: Dict[str, np.ndarray],
 
 
 def convert_vre_2_gen(ppc: Dict[str, np.ndarray],
-                      vre_prop: Union[np.ndarray, pd.DataFrame, None] = None) -> Tuple[Dict[str, np.ndarray], int]:
+                      vre_prop: Optional[Union[np.ndarray, pd.DataFrame]] = None
+                      ) -> Tuple[Dict[str, np.ndarray], int]:
     """
     Convert renewable generators to generators and add their parameters in the PyPower matrices.
 
@@ -375,11 +378,11 @@ class NYGrid:
 
     def __init__(self,
                  grid_data_dir: Union[str, os.PathLike],
-                 start_datetime: str,
-                 end_datetime: str,
-                 dcline_prop: Union[np.ndarray, pd.DataFrame, None] = None,
-                 esr_prop: Union[np.ndarray, pd.DataFrame, None] = None,
-                 vre_prop: Union[np.ndarray, pd.DataFrame, None] = None,
+                 start_datetime: Union[str, pd.Timestamp],
+                 end_datetime: Union[str, pd.Timestamp],
+                 dcline_prop: Optional[Union[np.ndarray, pd.DataFrame]] = None,
+                 esr_prop: Optional[Union[np.ndarray, pd.DataFrame]] = None,
+                 vre_prop: Optional[Union[np.ndarray, pd.DataFrame]] = None,
                  verbose: bool = False) -> None:
         """
         Initialize the NYGrid model.
@@ -408,8 +411,16 @@ class NYGrid:
         self.verbose = verbose
 
         # Format the forecast start/end and determine the total time.
-        self.start_datetime = format_date(start_datetime)
-        self.end_datetime = format_date(end_datetime)
+        if isinstance(start_datetime, pd.Timestamp):
+            self.start_datetime = start_datetime
+        elif isinstance(start_datetime, str):
+            self.start_datetime = format_date(start_datetime)
+
+        if isinstance(end_datetime, pd.Timestamp):
+            self.end_datetime = end_datetime
+        elif isinstance(end_datetime, str):
+            self.end_datetime = format_date(end_datetime)
+
         self.delta_t = self.end_datetime - self.start_datetime
         self.timestamp_list = pd.date_range(self.start_datetime, self.end_datetime, freq='1H')
         self.NT = len(self.timestamp_list)
@@ -591,7 +602,7 @@ class NYGrid:
             self.esrcost_dis = np.ones((self.NT, self.NESR)) * esr_prop[:, ESR_DIS_COST] * self.baseMVA
 
         # %% Create Pyomo model
-        self.model = None
+        self.model = pyo.ConcreteModel(name='multi-period DC OPF')
 
         # %% Penalty parameters and default values
         # ED module
@@ -925,7 +936,7 @@ class NYGrid:
 
         self.model = optimizer.model
 
-    def solve_dc_opf(self, solver_options: Dict[str, Union[int, float]] = None) -> None:
+    def solve_dc_opf(self, solver_options: Optional[Dict[str, Union[int, float]]] = None) -> None:
         """
         Solve a multi-period DC OPF problem.
 
@@ -938,9 +949,6 @@ class NYGrid:
         -------
         None
         """
-
-        # Create Pyomo model
-        self.model = pyo.ConcreteModel(name='multi-period DC OPF')
 
         # Check input dimensions
         self.check_input_dim()

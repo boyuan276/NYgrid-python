@@ -7,6 +7,13 @@
 
 A python version of the NYgrid model.
 
+It contains the following components:
+* Optimal power flow (OPF) model
+* Renewable integration
+* Building electrification
+* Battery storage
+* Electric vehicle (EV) charging
+
 ## Installation
 1. Install [Anaconda](https://www.anaconda.com/download/).
 2. Install [Git](https://git-scm.com/downloads).

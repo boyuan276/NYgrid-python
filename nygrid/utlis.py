@@ -30,7 +30,9 @@ def format_date(in_date: str) -> datetime.datetime:
                 '%b %d %Y %H', '%B %d %Y %H', '%b %d, %Y %H', '%B %d, %Y %H',
                 '%m-%d-%Y %H', '%m.%d.%Y %H', '%m/%d/%Y %H'):
         try:
-            return datetime.datetime.strptime(in_date, fmt)
+            out_date = datetime.datetime.strptime(in_date, fmt)
+            out_date = pd.to_datetime(out_date)
+            return out_date
         except ValueError:
             pass
     raise ValueError('No valid date format found; please use a common US format (e.g., Jan 01, 2011 00)')

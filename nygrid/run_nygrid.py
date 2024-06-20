@@ -166,7 +166,7 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
                                         'VRE_NAME': [f'{key}_{col}' for col in profile.columns]})
         vre_prop_list.append(vre_prop_a)
 
-    # %% Combine gen_prop tables
+    # Combine gen_prop tables
     vre_prop = pd.concat(vre_prop_list, ignore_index=True)
 
     # Combine genmax tables

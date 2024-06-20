@@ -123,22 +123,22 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
 
     # Aggregate current solar generation
     groupby_dict = current_solar_2bus['busIdx'].to_dict()
-    current_solar_gen_agg = current_solar_gen.groupby(groupby_dict, axis=1).sum()
+    current_solar_gen_agg = current_solar_gen.T.groupby(groupby_dict).sum().T
     current_solar_gen_agg = current_solar_gen_agg / 1e3  # convert from kW to MW
 
     # Aggregate future solar generation
     groupby_dict = future_solar_2bus['busIdx'].to_dict()
-    future_solar_gen_agg = future_solar_gen.groupby(groupby_dict, axis=1).sum()
+    future_solar_gen_agg = future_solar_gen.T.groupby(groupby_dict).sum().T
     future_solar_gen_agg = future_solar_gen_agg / 1e3  # convert from kW to MW
 
     # Aggregate onshore wind generation
     groupby_dict = onshore_wind_2bus['busIdx'].to_dict()
-    onshore_wind_gen_agg = onshore_wind_gen.groupby(groupby_dict, axis=1).sum()
+    onshore_wind_gen_agg = onshore_wind_gen.T.groupby(groupby_dict).sum().T
     onshore_wind_gen_agg = onshore_wind_gen_agg / 1e3  # convert from kW to MW
 
     # Aggregate offshore wind generation
     offshore_wind_gen_agg = offshore_wind_gen[['power_nyc', 'power_li']].rename(
-        columns={'power_nyc': 81, 'power_li': 82})
+        columns={'power_nyc': 81, 'power_li': 80})
 
     # 18.08% of current solar generation is built before 2018 (base year)
     # Scale down current solar generation by 18.08%
@@ -224,7 +224,7 @@ def read_electrification_data(buildings_data_dir: Union[str, os.PathLike]) -> pd
 
     # Aggregate building load to buses
     groupby_dict = dict(zip(fips_list, county_2bus['busIdx']))
-    res_load_change_bus = res_load_change.groupby(groupby_dict, axis=1).sum()
+    res_load_change_bus = res_load_change.T.groupby(groupby_dict).sum().T
     res_load_change_bus = res_load_change_bus / 1e3  # convert from kW to MW
 
     return res_load_change_bus
@@ -235,7 +235,7 @@ def run_nygrid_one_day(s_time: pd.Timestamp,
                        grid_data: Dict[str, pd.DataFrame],
                        grid_data_dir: Union[str, os.PathLike],
                        opts: Dict[str, Any],
-                       init_gen: np.ndarray) -> Dict[str, pd.DataFrame]:
+                       init_gen: Union[np.ndarray, None]) -> Dict[str, pd.DataFrame]:
     """
     Run NYGrid simulation for one day
 

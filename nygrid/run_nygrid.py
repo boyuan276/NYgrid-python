@@ -153,7 +153,6 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
     onshore_wind_gen_bus = onshore_wind_gen_bus * (1 - pct_onshore_wind_built)
 
     vre_profiles = {
-        # 'CurSol': current_solar_gen_bus,
         'FutSol': future_solar_gen_bus,
         'OnWind': onshore_wind_gen_bus,
         'OffWind': offshore_wind_gen_bus
@@ -171,8 +170,11 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
     vre_prop = pd.concat(vre_prop_list, ignore_index=True)
 
     # Combine genmax tables
-    genmax_profile_vre = pd.concat([current_solar_gen_bus, future_solar_gen_bus,
-                                    onshore_wind_gen_bus, offshore_wind_gen_bus], axis=1)
+    genmax_profile_vre = pd.concat([
+        future_solar_gen_bus,
+        onshore_wind_gen_bus, 
+        offshore_wind_gen_bus
+        ], axis=1)
     genmax_profile_vre.columns = vre_prop['VRE_NAME']
     genmax_profile_vre.index = genmax_profile_vre.index.tz_convert('US/Eastern').tz_localize(None)
 

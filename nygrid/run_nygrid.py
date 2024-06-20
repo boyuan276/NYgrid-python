@@ -88,7 +88,7 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
         VRE generation profiles
     """
 
-    # Renewable generation time series
+    # %% Renewable generation time series
     current_solar_gen = pd.read_csv(os.path.join(solar_data_dir, f'current_solar_gen_1hr.csv'),
                                     parse_dates=['Time'], index_col='Time').asfreq('H')
     current_solar_gen.columns = current_solar_gen.columns.astype(int)
@@ -116,44 +116,47 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
     offshore_wind_gen['power_li'] = np.where(offshore_wind_gen['power_li'] > capacity_li, capacity_li,
                                              offshore_wind_gen['power_li'])
 
-    # Renewable allocation table
-    current_solar_2bus = pd.read_csv(os.path.join(solar_data_dir, f'solar_farms_2bus.csv'), index_col='zip_code')
-    future_solar_2bus = pd.read_csv(os.path.join(solar_data_dir, f'future_solar_farms_2bus.csv'), index_col=0)
-    onshore_wind_2bus = pd.read_csv(os.path.join(onshore_wind_data_dir, f'onshore_wind_2bus.csv'), index_col=0)
-
+    # %% Aggregate renewable generation to buses
     # Aggregate current solar generation
+    current_solar_2bus = pd.read_csv(os.path.join(solar_data_dir, f'solar_farms_2bus.csv'), index_col='zip_code')
     groupby_dict = current_solar_2bus['busIdx'].to_dict()
-    current_solar_gen_agg = current_solar_gen.T.groupby(groupby_dict).sum().T
-    current_solar_gen_agg = current_solar_gen_agg / 1e3  # convert from kW to MW
+    current_solar_gen_bus = current_solar_gen.T.groupby(groupby_dict).sum().T
+    current_solar_gen_bus = current_solar_gen_bus / 1e3  # convert from kW to MW
 
     # Aggregate future solar generation
+    future_solar_2bus = pd.read_csv(os.path.join(solar_data_dir, f'future_solar_farms_2bus.csv'), index_col=0)
     groupby_dict = future_solar_2bus['busIdx'].to_dict()
-    future_solar_gen_agg = future_solar_gen.T.groupby(groupby_dict).sum().T
-    future_solar_gen_agg = future_solar_gen_agg / 1e3  # convert from kW to MW
+    future_solar_gen_bus = future_solar_gen.T.groupby(groupby_dict).sum().T
+    future_solar_gen_bus = future_solar_gen_bus / 1e3  # convert from kW to MW
 
     # Aggregate onshore wind generation
+    onshore_wind_2bus = pd.read_csv(os.path.join(onshore_wind_data_dir, f'onshore_wind_2bus.csv'), index_col=0)
     groupby_dict = onshore_wind_2bus['busIdx'].to_dict()
-    onshore_wind_gen_agg = onshore_wind_gen.T.groupby(groupby_dict).sum().T
-    onshore_wind_gen_agg = onshore_wind_gen_agg / 1e3  # convert from kW to MW
+    onshore_wind_gen_bus = onshore_wind_gen.T.groupby(groupby_dict).sum().T
+    onshore_wind_gen_bus = onshore_wind_gen_bus / 1e3  # convert from kW to MW
 
     # Aggregate offshore wind generation
-    offshore_wind_gen_agg = offshore_wind_gen[['power_nyc', 'power_li']].rename(
+    offshore_wind_gen_bus = offshore_wind_gen[['power_nyc', 'power_li']].rename(
         columns={'power_nyc': 81, 'power_li': 80})
 
+    # %% Adjust renewable generation profiles
     # 18.08% of current solar generation is built before 2018 (base year)
     # Scale down current solar generation by 18.08%
     pct_current_solar_built = 0.1808
-    current_solar_gen_agg = current_solar_gen_agg * (1 - pct_current_solar_built)
+    # current_solar_gen_bus_built = current_solar_gen_bus * pct_current_solar_built
+    future_solar_gen_bus_planned = current_solar_gen_bus * (1 - pct_current_solar_built)
+    future_solar_gen_bus = future_solar_gen_bus.add(future_solar_gen_bus_planned, fill_value=0)
 
     # 90.6% of onshore wind generation is built before 2018 (base year)
     # Scale down onshore wind generation by 90.6%
     pct_onshore_wind_built = 0.906
-    onshore_wind_gen_agg = onshore_wind_gen_agg * (1 - pct_onshore_wind_built)
+    onshore_wind_gen_bus = onshore_wind_gen_bus * (1 - pct_onshore_wind_built)
 
-    vre_profiles = {'CurSol': current_solar_gen_agg,
-                    'FutSol': future_solar_gen_agg,
-                    'OnWind': onshore_wind_gen_agg,
-                    'OffWind': offshore_wind_gen_agg}
+    vre_profiles = {
+        'FutSol': future_solar_gen_bus,
+        'OnWind': onshore_wind_gen_bus,
+        'OffWind': offshore_wind_gen_bus
+        }
     vre_prop_list = list()
     for key, profile in vre_profiles.items():
         vre_prop_a = pd.DataFrame(data={'VRE_BUS': profile.columns,
@@ -167,8 +170,11 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
     vre_prop = pd.concat(vre_prop_list, ignore_index=True)
 
     # Combine genmax tables
-    genmax_profile_vre = pd.concat([current_solar_gen_agg, future_solar_gen_agg,
-                                    onshore_wind_gen_agg, offshore_wind_gen_agg], axis=1)
+    genmax_profile_vre = pd.concat([
+        future_solar_gen_bus,
+        onshore_wind_gen_bus, 
+        offshore_wind_gen_bus
+        ], axis=1)
     genmax_profile_vre.columns = vre_prop['VRE_NAME']
     genmax_profile_vre.index = genmax_profile_vre.index.tz_convert('US/Eastern').tz_localize(None)
 

@@ -868,7 +868,7 @@ class NYGrid:
         self.br_max[self.br_max != 999.99] = 999.99
         self.br_min[self.br_min != -999.99] = -999.99
 
-    def set_gen_init_data(self, gen_init: np.ndarray) -> None:
+    def set_gen_init_data(self, gen_init: Optional[np.ndarray]) -> None:
         """
         Get generator initial condition.
 

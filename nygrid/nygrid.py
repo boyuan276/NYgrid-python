@@ -516,7 +516,7 @@ class NYGrid:
 
         # Get interface limit information
         self.if_map = self.ppc_int['if']['map']
-        self.if_lims = self.ppc_int['if']['lims']
+        self.if_lims = self.ppc_int['if']['lims'].astype(float)
         self.if_lims[:, 1:] = self.if_lims[:, 1:] / self.baseMVA
         self.NIF = len(self.if_lims)
 

@@ -8,14 +8,14 @@ Known Issues/Wishlist:
 
 """
 import logging
-import os.path
+import os
 
 import numpy as np
 import pandas as pd
 import pyomo.environ as pyo
-import pyomo.opt.results.results_
 import pypower.api as pp
 from pyomo.opt import SolverStatus, TerminationCondition
+from pyomo.opt.results.results_ import SolverResults
 
 from nygrid.optimizer import Optimizer
 from nygrid.ppc_idx import *
@@ -24,7 +24,7 @@ from nygrid.utlis import format_date
 from typing import Union, Dict, Tuple
 
 
-def check_status(results: pyomo.opt.results.results_.SolverResults) -> bool:
+def check_status(results: SolverResults) -> bool:
     """
     Check the status of a Pyomo model.
 
@@ -150,7 +150,7 @@ def read_grid_data(grid_data_dir: Union[str, os.PathLike]) -> Dict[str, pd.DataF
 
 
 def convert_dcline_2_gen(ppc: Dict[str, np.ndarray],
-                         dcline_prop: Union[np.ndarray, pd.DataFrame] = None) -> Tuple[Dict[str, np.ndarray], int]:
+                         dcline_prop: Union[np.ndarray, pd.DataFrame, None] = None) -> Tuple[Dict[str, np.ndarray], int]:
     """
     Convert DC lines to generators and add their parameters in the PyPower matrices.
     For each DC line, add two injectors: one at FROM bus and another at TO bus.
@@ -232,7 +232,7 @@ def convert_dcline_2_gen(ppc: Dict[str, np.ndarray],
 
 
 def convert_esr_2_gen(ppc: Dict[str, np.ndarray],
-                      esr_prop: Union[np.ndarray, pd.DataFrame] = None) -> Tuple[Dict[str, np.ndarray], int]:
+                      esr_prop: Union[np.ndarray, pd.DataFrame, None] = None) -> Tuple[Dict[str, np.ndarray], int]:
     """
     Convert ESR to generators and add their parameters in the PyPower matrices.
     For each ESR, add one injector to represent the combined injection of the ESR.
@@ -301,7 +301,7 @@ def convert_esr_2_gen(ppc: Dict[str, np.ndarray],
 
 
 def convert_vre_2_gen(ppc: Dict[str, np.ndarray],
-                      vre_prop: Union[np.ndarray, pd.DataFrame] = None) -> Tuple[Dict[str, np.ndarray], int]:
+                      vre_prop: Union[np.ndarray, pd.DataFrame, None] = None) -> Tuple[Dict[str, np.ndarray], int]:
     """
     Convert renewable generators to generators and add their parameters in the PyPower matrices.
 
@@ -377,9 +377,9 @@ class NYGrid:
                  grid_data_dir: Union[str, os.PathLike],
                  start_datetime: str,
                  end_datetime: str,
-                 dcline_prop: Union[np.ndarray, pd.DataFrame] = None,
-                 esr_prop: Union[np.ndarray, pd.DataFrame] = None,
-                 vre_prop: Union[np.ndarray, pd.DataFrame] = None,
+                 dcline_prop: Union[np.ndarray, pd.DataFrame, None] = None,
+                 esr_prop: Union[np.ndarray, pd.DataFrame, None] = None,
+                 vre_prop: Union[np.ndarray, pd.DataFrame, None] = None,
                  verbose: bool = False) -> None:
         """
         Initialize the NYGrid model.
@@ -405,8 +405,6 @@ class NYGrid:
         # self.ppc = pp.loadcase(ppc_filename)
 
         # %% Set the start and end datetime of the simulation
-        self.start_datetime = start_datetime
-        self.end_datetime = end_datetime
         self.verbose = verbose
 
         # Format the forecast start/end and determine the total time.

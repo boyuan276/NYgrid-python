@@ -103,7 +103,7 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
 
     offshore_wind_gen = pd.read_csv(os.path.join(offshore_wind_data_dir, f'power_load_2018.csv'),
                                     parse_dates=['timestamp'], index_col='timestamp')
-    offshore_wind_gen.index = offshore_wind_gen.index.tz_localize('US/Eastern', ambiguous='infer')
+    offshore_wind_gen.index = offshore_wind_gen.index.tz_localize('US/Eastern', ambiguous='infer') # type: ignore
     offshore_wind_gen.index.freq = 'H'
 
     # Wind farm capacity info
@@ -176,7 +176,7 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
         offshore_wind_gen_bus
         ], axis=1)
     genmax_profile_vre.columns = vre_prop['VRE_NAME']
-    genmax_profile_vre.index = genmax_profile_vre.index.tz_convert('US/Eastern').tz_localize(None)
+    genmax_profile_vre.index = genmax_profile_vre.index.tz_convert('US/Eastern').tz_localize(None) # type: ignore
 
     return vre_prop, genmax_profile_vre
 

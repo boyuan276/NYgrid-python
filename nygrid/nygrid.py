@@ -666,6 +666,10 @@ class NYGrid:
         None
         """
 
+        # Check the shape of the load profile
+        if load_sch.shape[1] != self.NB:
+            raise ValueError('The number of buses in the load profile does not match the network.')
+
         # Slice the load profile to the simulation period
         load_sch = load_sch[self.start_datetime:self.end_datetime].to_numpy()
 

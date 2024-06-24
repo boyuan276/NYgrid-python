@@ -1,10 +1,12 @@
 import os
+
 import numpy as np
 import pandas as pd
 import pickle
-from nygrid.nygrid import NYGrid
 from typing import Union, Dict, Tuple, Any
 
+from nygrid.nygrid import NYGrid
+from nygrid.preprocessing import agg_demand_county2bus, get_res_load_change_county
 
 def read_grid_data(data_dir: Union[str, os.PathLike],
                    year: int) -> Dict[str, pd.DataFrame]:
@@ -181,12 +183,12 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
     return vre_prop, genmax_profile_vre
 
 
-def read_electrification_data(buildings_data_dir: Union[str, os.PathLike]) -> pd.DataFrame:
+def read_electrification_data(resstock_proc_dir: Union[str, os.PathLike]) -> pd.DataFrame:
     """
 
     Parameters
     ----------
-    buildings_data_dir: str
+    resstock_proc_dir: str
         Directory of buildings data
 
     Returns
@@ -194,46 +196,60 @@ def read_electrification_data(buildings_data_dir: Union[str, os.PathLike]) -> pd
     res_load_change_bus: pandas.DataFrame
         Changes in residential load
     """
-    # Read county to bus allocation table
-    county_2bus = pd.read_csv(os.path.join(buildings_data_dir, 'county_centroids_2bus.csv'),
-                              index_col=0)
-    fips_list = ['G' + s[:2] + '0' + s[2:] + '0' for s in county_2bus['FIPS_CODE'].astype(str)]
 
-    # County-level load data
-    # Residential buildings current load (upgrade=0)
-    pickle_dir = os.path.join(buildings_data_dir, 'euss_processed', 'upgrade=0')
-    res_current_load = pd.DataFrame()
+    # %% 1. Residential building energy changes due to electrification
 
-    for ii in range(len(fips_list)):
-        pickle_file = os.path.join(pickle_dir, f'{fips_list[0]}_elec_total.pkl')
-        # Read pickle file
-        with open(os.path.join(pickle_dir, pickle_file), 'rb') as f:
-            county_load = pickle.load(f)
-            county_load = county_load.rename(columns={'total': fips_list[ii]})
-            res_current_load = pd.concat([res_current_load, county_load], axis=1)
+    # Use upgrade scenario 10 in NREL's EUSS data set
+    upgrade_id = 10  #NOTE: Update upgrade_id
 
-    # Residential buildings future load (upgrade=10)
-    pickle_dir = os.path.join(buildings_data_dir, 'euss_processed', 'upgrade=10')
-    res_elec_load = pd.DataFrame()
+    # Directory for processed data output
+    resstock_bldg_proc_dir = os.path.join(resstock_proc_dir, 'county_processed', 
+                                          f'upgrade={upgrade_id}')
 
-    for ii in range(len(fips_list)):
-        pickle_file = os.path.join(pickle_dir, f'{fips_list[0]}_elec_total.pkl')
-        # Read pickle file
-        with open(os.path.join(pickle_dir, pickle_file), 'rb') as f:
-            county_load = pickle.load(f)
-            county_load = county_load.rename(columns={'total': fips_list[ii]})
-            res_elec_load = pd.concat([res_elec_load, county_load], axis=1)
+    # Read metadata
+    metadata_dir = os.path.join(resstock_proc_dir, 'metadata')
+    metadata_state = pd.read_csv(os.path.join(metadata_dir,
+                                f'resstock_metadata_ny_{upgrade_id}.csv'),
+                                index_col=0, low_memory=False)
 
-    # Changes in residential load
-    res_load_change = res_elec_load - res_current_load
-    res_load_change.index.name = 'Time'
+    # Create a list of building types
+    res_bldg_type_list = list(pd.unique(metadata_state['in.geometry_building_type_recs']))
 
-    # Aggregate building load to buses
-    groupby_dict = dict(zip(fips_list, county_2bus['busIdx']))
-    res_load_change_bus = res_load_change.T.groupby(groupby_dict).sum().T
-    res_load_change_bus = res_load_change_bus / 1e3  # convert from kW to MW
+    # Create a list of county IDs
+    county_id_list = sorted(metadata_state['in.county'].drop_duplicates().to_list())
 
-    return res_load_change_bus
+    # Read county name, ID and allocation table
+    county2point = pd.read_csv(os.path.join(resstock_proc_dir, 'county_2_point.csv'), index_col=0)
+    county2bus = pd.read_csv(os.path.join(resstock_proc_dir, 'county_2_bus.csv'))
+
+    # Read pre-processed EUSS energy saving data
+    euss_ts_2018_list = list()
+
+    for county_id in county_id_list:
+        fips = int(county_id[1:3]+county_id[4:7])
+        county_name = county2point[county2point['FIPS_CODE'] == fips]['NAME'].values[0]
+
+        _, _, df_county_saving_amy2018 = get_res_load_change_county(
+            county_id, upgrade_id, res_bldg_type_list, resstock_bldg_proc_dir)
+        county_ts = df_county_saving_amy2018['electricity'].rename(county_name)
+        euss_ts_2018_list.append(county_ts)
+
+    euss_ts_2018_all = pd.concat(euss_ts_2018_list, axis=1) * -1  # Convert savings to increase
+
+    # %% Aggregate county-level changes to bus-level changes
+
+    res_load_change_bus = agg_demand_county2bus(euss_ts_2018_all, county2bus)
+    res_load_change_bus = res_load_change_bus / 1e3 # Convert kW to MW
+
+    
+    # Combine load changes from different sectors
+    load_change_bus = res_load_change_bus
+    load_change_bus = load_change_bus.sort_index(axis=1)
+
+    # Set index name
+    load_change_bus.index.name = 'TimeStamp'
+    
+    return load_change_bus
 
 
 def run_nygrid_one_day(s_time: pd.Timestamp,

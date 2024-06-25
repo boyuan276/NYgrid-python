@@ -183,73 +183,174 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
     return vre_prop, genmax_profile_vre
 
 
-def read_electrification_data(resstock_proc_dir: Union[str, os.PathLike]) -> pd.DataFrame:
+def read_res_building_elec_data(data_dir: Union[str, os.PathLike],
+                                upgrade_id: int,
+                                county_attrs: pd.DataFrame) -> pd.DataFrame:
+    
+    """
+    Residential building energy changes due to electrification.
+
+    Parameters
+    ----------
+    data_dir : str
+        Directory of residential building data
+    upgrade_id : int
+        Residential building upgrade scenario ID
+    county_attrs : pd.DataFrame
+        County attributes
+
+    Returns
+    -------
+    res_load_change_county : pd.DataFrame
+        Residential building load change by county
+    """
+
+    # Directory for processed data output
+    resstock_bldg_proc_dir = os.path.join(data_dir, 
+                                          'county_processed', 
+                                          f'upgrade={upgrade_id}')
+
+    # Create a list of building types
+    res_bldg_type_list = ['Single-Family Detached', 
+                          'Multi-Family with 5+ Units', 
+                          'Multi-Family with 2 - 4 Units', 
+                          'Mobile Home', 
+                          'Single-Family Attached']
+
+    # Read pre-processed EUSS energy saving data
+    res_county_ts_list = list()
+
+    for i, row in county_attrs.iterrows():
+        county_name = row['NAME']
+        fips = row['FIPS_CODE']
+        county_id = f'G{str(fips)[:2]}0{str(fips)[2:]}0'
+
+        _, _, df_county_saving_amy2018 = get_res_load_change_county(
+            county_id, upgrade_id, res_bldg_type_list, resstock_bldg_proc_dir)
+        
+        res_county_ts = df_county_saving_amy2018['electricity'].rename(county_name)
+        res_county_ts_list.append(res_county_ts)
+
+    res_load_change_county = pd.concat(res_county_ts_list, axis=1) * -1  # Convert savings to increase
+    res_load_change_county = res_load_change_county / 1e3  # Convert from kW to MW
+
+    return res_load_change_county
+
+
+def read_com_building_elec_data(data_dir: Union[str, os.PathLike],
+                                upgrade_id: int,
+                                county_attrs: pd.DataFrame,
+                                ) -> pd.DataFrame:
+    
+    raise NotImplementedError
+
+
+def read_ev_elec_data(data_dir: Union[str, os.PathLike],
+                      upgrade_id: int,
+                      county_attrs: pd.DataFrame) -> pd.DataFrame:
+    
+    """
+    Electric vehicle energy changes due to electrification.
+
+    Parameters
+    ----------
+    data_dir : str
+        Directory of EV data
+    upgrade_id : int
+        EV upgrade scenario ID
+    county_attrs : pd.DataFrame
+        County attributes
+
+    Returns
+    -------
+    ev_load_change_county : pd.DataFrame
+        EV load change by county
+    """
+    
+    # Create a list of EV charger types
+    charger_types = ['home_l1', 'home_l2', 'work_l1', 'work_l2', 'public_l2', 'public_l3']
+
+    ev_county_ts_list = list()
+
+    for i, row in county_attrs.iterrows():
+        county_name = row['NAME']
+        county_name = county_name.replace(' ', '_')
+
+        monthly_list = list()
+
+        for m in range(1, 13):
+            filename = f"{county_name}_County_month{m}_scen{upgrade_id}_temp_gridLoad.csv"
+            ev_load = pd.read_csv(os.path.join(data_dir, filename),
+                                parse_dates=True, index_col=0)
+
+            # Sum by charger types and resample to hourly        
+            ev_load_total = ev_load[charger_types].sum(axis=1).resample('H').sum()
+
+            monthly_list.append(ev_load_total)
+        
+        ev_county_ts = pd.concat(monthly_list, axis=0).rename(county_name)
+        ev_county_ts_list.append(ev_county_ts)
+
+    ev_load_change_county = pd.concat(ev_county_ts_list, axis=1)
+    ev_load_change_county = ev_load_change_county / 1e3  # Convert from kW to MW
+
+    return ev_load_change_county
+
+
+
+def read_electrification_data(electrification_dict: Dict[str, Any],
+                              county_attrs: pd.DataFrame,
+                              county_2_bus: pd.DataFrame
+                              ) -> Dict[str, Any]:
     """
 
     Parameters
     ----------
-    resstock_proc_dir: str
-        Directory of buildings data
+    electrification_dict : dict
+        Dictionary of electrification data
+        Keys: 'res_building', 'com_building', 'electric_vehicle'
+        In each dictionary, the following keys are required:
+            'data_dir': str
+            'upgrade_id': int
+    county_attrs : pd.DataFrame
+        County attributes
+    county_2_bus : pd.DataFrame
+        County to bus mapping
 
     Returns
     -------
-    res_load_change_bus: pandas.DataFrame
-        Changes in residential load
+    electrification_dict : dict
+        Dictionary of electrification data
+        Keys: 'res_building', 'com_building', 'electric_vehicle'
+        In each dictionary, the following keys are required:
+            'data_dir': str
+            'upgrade_id': int
+            'load_change': pd.DataFrame
     """
 
-    # %% 1. Residential building energy changes due to electrification
+    print(f"Get electrification data for {len(electrification_dict)} sectors:")
+    print(list(electrification_dict.keys()))
 
-    # Use upgrade scenario 10 in NREL's EUSS data set
-    upgrade_id = 10  #NOTE: Update upgrade_id
-
-    # Directory for processed data output
-    resstock_bldg_proc_dir = os.path.join(resstock_proc_dir, 'county_processed', 
-                                          f'upgrade={upgrade_id}')
-
-    # Read metadata
-    metadata_dir = os.path.join(resstock_proc_dir, 'metadata')
-    metadata_state = pd.read_csv(os.path.join(metadata_dir,
-                                f'resstock_metadata_ny_{upgrade_id}.csv'),
-                                index_col=0, low_memory=False)
-
-    # Create a list of building types
-    res_bldg_type_list = list(pd.unique(metadata_state['in.geometry_building_type_recs']))
-
-    # Create a list of county IDs
-    county_id_list = sorted(metadata_state['in.county'].drop_duplicates().to_list())
-
-    # Read county name, ID and allocation table
-    county2point = pd.read_csv(os.path.join(resstock_proc_dir, 'county_2_point.csv'), index_col=0)
-    county2bus = pd.read_csv(os.path.join(resstock_proc_dir, 'county_2_bus.csv'))
-
-    # Read pre-processed EUSS energy saving data
-    euss_ts_2018_list = list()
-
-    for county_id in county_id_list:
-        fips = int(county_id[1:3]+county_id[4:7])
-        county_name = county2point[county2point['FIPS_CODE'] == fips]['NAME'].values[0]
-
-        _, _, df_county_saving_amy2018 = get_res_load_change_county(
-            county_id, upgrade_id, res_bldg_type_list, resstock_bldg_proc_dir)
-        county_ts = df_county_saving_amy2018['electricity'].rename(county_name)
-        euss_ts_2018_list.append(county_ts)
-
-    euss_ts_2018_all = pd.concat(euss_ts_2018_list, axis=1) * -1  # Convert savings to increase
-
-    # %% Aggregate county-level changes to bus-level changes
-
-    res_load_change_bus = agg_demand_county2bus(euss_ts_2018_all, county2bus)
-    res_load_change_bus = res_load_change_bus / 1e3 # Convert kW to MW
-
+    process_functions = {
+        'res_building': read_res_building_elec_data,
+        'com_building': read_com_building_elec_data,
+        'electric_vehicle': read_ev_elec_data
+    }
     
-    # Combine load changes from different sectors
-    load_change_bus = res_load_change_bus
-    load_change_bus = load_change_bus.sort_index(axis=1)
-
-    # Set index name
-    load_change_bus.index.name = 'TimeStamp'
+    for sector, attrs in electrification_dict.items():
+        if sector in process_functions:
+            print(f"Processing {sector} electrification data...")
+            func = process_functions[sector]
+            load_change_county = func(data_dir=attrs['data_dir'], 
+                                      upgrade_id=attrs['upgrade_id'], 
+                                      county_attrs=county_attrs)
+            load_change_bus = agg_demand_county2bus(load_change_county,
+                                                    county_2_bus)
+            electrification_dict[sector]['load_change'] = load_change_bus
+        else:
+            raise ValueError(f"Invalid sector: {sector}")
     
-    return load_change_bus
+    return electrification_dict
 
 
 def run_nygrid_one_day(s_time: pd.Timestamp,

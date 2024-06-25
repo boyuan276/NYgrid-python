@@ -1,8 +1,6 @@
 # User-specific stuff
-data/solar
-data/onshore_wind
-data/offshore_wind
-data/buildings
+data/renewable/
+data/load/
 figures/
 results/
 .idea/

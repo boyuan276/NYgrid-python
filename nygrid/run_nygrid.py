@@ -183,7 +183,9 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
     return vre_prop, genmax_profile_vre
 
 
-def read_electrification_data(resstock_proc_dir: Union[str, os.PathLike]) -> pd.DataFrame:
+def read_electrification_data(res_building_data_dir: Union[str, os.PathLike],
+                              county_attrs: pd.DataFrame,
+                              county_2_bus: pd.DataFrame) -> pd.DataFrame:
     """
 
     Parameters
@@ -200,34 +202,27 @@ def read_electrification_data(resstock_proc_dir: Union[str, os.PathLike]) -> pd.
     # %% 1. Residential building energy changes due to electrification
 
     # Use upgrade scenario 10 in NREL's EUSS data set
-    upgrade_id = 10  #NOTE: Update upgrade_id
+    upgrade_id = 10  # NOTE: Update upgrade_id
 
     # Directory for processed data output
-    resstock_bldg_proc_dir = os.path.join(resstock_proc_dir, 'county_processed', 
+    resstock_bldg_proc_dir = os.path.join(res_building_data_dir, 
+                                          'county_processed', 
                                           f'upgrade={upgrade_id}')
 
-    # Read metadata
-    metadata_dir = os.path.join(resstock_proc_dir, 'metadata')
-    metadata_state = pd.read_csv(os.path.join(metadata_dir,
-                                f'resstock_metadata_ny_{upgrade_id}.csv'),
-                                index_col=0, low_memory=False)
-
     # Create a list of building types
-    res_bldg_type_list = list(pd.unique(metadata_state['in.geometry_building_type_recs']))
-
-    # Create a list of county IDs
-    county_id_list = sorted(metadata_state['in.county'].drop_duplicates().to_list())
-
-    # Read county name, ID and allocation table
-    county2point = pd.read_csv(os.path.join(resstock_proc_dir, 'county_2_point.csv'), index_col=0)
-    county2bus = pd.read_csv(os.path.join(resstock_proc_dir, 'county_2_bus.csv'))
+    res_bldg_type_list = ['Single-Family Detached', 
+                          'Multi-Family with 5+ Units', 
+                          'Multi-Family with 2 - 4 Units', 
+                          'Mobile Home', 
+                          'Single-Family Attached']
 
     # Read pre-processed EUSS energy saving data
     euss_ts_2018_list = list()
 
-    for county_id in county_id_list:
-        fips = int(county_id[1:3]+county_id[4:7])
-        county_name = county2point[county2point['FIPS_CODE'] == fips]['NAME'].values[0]
+    for i, row in county_attrs.iterrows():
+        county_name = row['NAME']
+        fips = row['FIPS_CODE']
+        county_id = f'G{str(fips)[:2]}0{str(fips)[2:]}0'
 
         _, _, df_county_saving_amy2018 = get_res_load_change_county(
             county_id, upgrade_id, res_bldg_type_list, resstock_bldg_proc_dir)
@@ -238,11 +233,11 @@ def read_electrification_data(resstock_proc_dir: Union[str, os.PathLike]) -> pd.
 
     # %% Aggregate county-level changes to bus-level changes
 
-    res_load_change_bus = agg_demand_county2bus(euss_ts_2018_all, county2bus)
+    res_load_change_bus = agg_demand_county2bus(euss_ts_2018_all, county_2_bus)
     res_load_change_bus = res_load_change_bus / 1e3 # Convert kW to MW
 
     
-    # Combine load changes from different sectors
+    # %% Combine load changes from different sectors
     load_change_bus = res_load_change_bus
     load_change_bus = load_change_bus.sort_index(axis=1)
 

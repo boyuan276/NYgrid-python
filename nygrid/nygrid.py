@@ -694,7 +694,8 @@ class NYGrid:
         """
 
         # Slice the generation profile to the simulation period
-        gen_mw_sch = gen_mw_sch[self.start_datetime:self.end_datetime].to_numpy()
+        gen_mw_sch = gen_mw_sch[self.start_datetime:
+                                self.end_datetime].to_numpy()
 
         # Generator schedule in p.u.
         if gen_mw_sch is not None and gen_mw_sch.size > 0:
@@ -724,7 +725,8 @@ class NYGrid:
         """
 
         # Slice the generator profile to the simulation period
-        gen_max_sch = gen_max_sch[self.start_datetime:self.end_datetime].to_numpy()
+        gen_max_sch = gen_max_sch[self.start_datetime:
+                                  self.end_datetime].to_numpy()
 
         # Generator upper operating limit in p.u.
         if gen_max_sch is not None and gen_max_sch.size > 0:
@@ -749,7 +751,8 @@ class NYGrid:
         """
 
         # Slice the generator profile to the simulation period
-        vre_max_sch = vre_max_sch[self.start_datetime:self.end_datetime].to_numpy()
+        vre_max_sch = vre_max_sch[self.start_datetime:
+                                  self.end_datetime].to_numpy()
 
         # Generator upper operating limit in p.u.
         if vre_max_sch is not None and vre_max_sch.size > 0:
@@ -774,7 +777,8 @@ class NYGrid:
         """
 
         # Slice the generator profile to the simulation period
-        gen_min_sch = gen_min_sch[self.start_datetime:self.end_datetime].to_numpy()
+        gen_min_sch = gen_min_sch[self.start_datetime:
+                                  self.end_datetime].to_numpy()
 
         # Generator lower operating limit in p.u.
         if gen_min_sch is not None and gen_min_sch.size > 0:
@@ -804,7 +808,8 @@ class NYGrid:
         # Convert 30min ramp rate to hourly ramp rate
         if interval == '30min':
             gen_ramp_sch = gen_ramp_sch * 2
-            gen_ramp_sch = gen_ramp_sch[self.start_datetime:self.end_datetime].to_numpy()
+            gen_ramp_sch = gen_ramp_sch[self.start_datetime:
+                                        self.end_datetime].to_numpy()
 
             # Convert default value 0 (Unlimited) to 1e6
             gen_ramp_sch[gen_ramp_sch == 0] = 1e6
@@ -841,8 +846,10 @@ class NYGrid:
         """
 
         # Slice the generator profile to the simulation period
-        gen_cost0_sch = gen_cost0_sch[self.start_datetime:self.end_datetime].to_numpy()
-        gen_cost1_sch = gen_cost1_sch[self.start_datetime:self.end_datetime].to_numpy()
+        gen_cost0_sch = gen_cost0_sch[self.start_datetime:
+                                      self.end_datetime].to_numpy()
+        gen_cost1_sch = gen_cost1_sch[self.start_datetime:
+                                      self.end_datetime].to_numpy()
 
         # Linear cost intercept coefficients in p.u.
         if gen_cost0_sch is not None and gen_cost0_sch.size > 0:

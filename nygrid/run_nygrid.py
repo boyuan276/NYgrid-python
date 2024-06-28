@@ -6,7 +6,8 @@ import pickle
 from typing import Union, Dict, Tuple, Any
 
 from nygrid.nygrid import NYGrid
-from nygrid.preprocessing import agg_demand_county2bus, get_res_load_change_county
+from nygrid.preprocessing import agg_demand_county2bus, get_building_load_change_county
+
 
 def read_grid_data(data_dir: Union[str, os.PathLike],
                    year: int) -> Dict[str, pd.DataFrame]:
@@ -70,7 +71,8 @@ def read_grid_data(data_dir: Union[str, os.PathLike],
 
 def read_vre_data(solar_data_dir: Union[str, os.PathLike],
                   onshore_wind_data_dir: Union[str, os.PathLike],
-                  offshore_wind_data_dir: Union[str, os.PathLike]) -> Tuple[pd.DataFrame, pd.DataFrame]:
+                  offshore_wind_data_dir: Union[str, os.PathLike]
+                  ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
 
     Parameters
@@ -105,7 +107,8 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
 
     offshore_wind_gen = pd.read_csv(os.path.join(offshore_wind_data_dir, f'power_load_2018.csv'),
                                     parse_dates=['timestamp'], index_col='timestamp')
-    offshore_wind_gen.index = offshore_wind_gen.index.tz_localize('US/Eastern', ambiguous='infer') # type: ignore
+    offshore_wind_gen.index = offshore_wind_gen.index.tz_localize(  # type: ignore
+        'US/Eastern', ambiguous='infer')
     offshore_wind_gen.index.freq = 'H'
 
     # Wind farm capacity info
@@ -120,19 +123,22 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
 
     # %% Aggregate renewable generation to buses
     # Aggregate current solar generation
-    current_solar_2bus = pd.read_csv(os.path.join(solar_data_dir, f'solar_farms_2bus.csv'), index_col='zip_code')
+    current_solar_2bus = pd.read_csv(os.path.join(
+        solar_data_dir, f'solar_farms_2bus.csv'), index_col='zip_code')
     groupby_dict = current_solar_2bus['busIdx'].to_dict()
     current_solar_gen_bus = current_solar_gen.T.groupby(groupby_dict).sum().T
     current_solar_gen_bus = current_solar_gen_bus / 1e3  # convert from kW to MW
 
     # Aggregate future solar generation
-    future_solar_2bus = pd.read_csv(os.path.join(solar_data_dir, f'future_solar_farms_2bus.csv'), index_col=0)
+    future_solar_2bus = pd.read_csv(os.path.join(
+        solar_data_dir, f'future_solar_farms_2bus.csv'), index_col=0)
     groupby_dict = future_solar_2bus['busIdx'].to_dict()
     future_solar_gen_bus = future_solar_gen.T.groupby(groupby_dict).sum().T
     future_solar_gen_bus = future_solar_gen_bus / 1e3  # convert from kW to MW
 
     # Aggregate onshore wind generation
-    onshore_wind_2bus = pd.read_csv(os.path.join(onshore_wind_data_dir, f'onshore_wind_2bus.csv'), index_col=0)
+    onshore_wind_2bus = pd.read_csv(os.path.join(
+        onshore_wind_data_dir, f'onshore_wind_2bus.csv'), index_col=0)
     groupby_dict = onshore_wind_2bus['busIdx'].to_dict()
     onshore_wind_gen_bus = onshore_wind_gen.T.groupby(groupby_dict).sum().T
     onshore_wind_gen_bus = onshore_wind_gen_bus / 1e3  # convert from kW to MW
@@ -146,8 +152,10 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
     # Scale down current solar generation by 18.08%
     pct_current_solar_built = 0.1808
     # current_solar_gen_bus_built = current_solar_gen_bus * pct_current_solar_built
-    future_solar_gen_bus_planned = current_solar_gen_bus * (1 - pct_current_solar_built)
-    future_solar_gen_bus = future_solar_gen_bus.add(future_solar_gen_bus_planned, fill_value=0)
+    future_solar_gen_bus_planned = current_solar_gen_bus * \
+        (1 - pct_current_solar_built)
+    future_solar_gen_bus = future_solar_gen_bus.add(
+        future_solar_gen_bus_planned, fill_value=0)
 
     # 90.6% of onshore wind generation is built before 2018 (base year)
     # Scale down onshore wind generation by 90.6%
@@ -158,7 +166,7 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
         'FutSol': future_solar_gen_bus,
         'OnWind': onshore_wind_gen_bus,
         'OffWind': offshore_wind_gen_bus
-        }
+    }
     vre_prop_list = list()
     for key, profile in vre_profiles.items():
         vre_prop_a = pd.DataFrame(data={'VRE_BUS': profile.columns,
@@ -174,19 +182,20 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
     # Combine genmax tables
     genmax_profile_vre = pd.concat([
         future_solar_gen_bus,
-        onshore_wind_gen_bus, 
+        onshore_wind_gen_bus,
         offshore_wind_gen_bus
-        ], axis=1)
+    ], axis=1)
     genmax_profile_vre.columns = vre_prop['VRE_NAME']
-    genmax_profile_vre.index = genmax_profile_vre.index.tz_convert('US/Eastern').tz_localize(None) # type: ignore
+    genmax_profile_vre.index = genmax_profile_vre.index.tz_convert(  # type: ignore
 
+        'US/Eastern').tz_localize(None)
     return vre_prop, genmax_profile_vre
 
 
 def read_res_building_elec_data(data_dir: Union[str, os.PathLike],
                                 upgrade_id: int,
-                                county_attrs: pd.DataFrame) -> pd.DataFrame:
-    
+                                county_attrs: pd.DataFrame
+                                ) -> pd.DataFrame:
     """
     Residential building energy changes due to electrification.
 
@@ -206,15 +215,15 @@ def read_res_building_elec_data(data_dir: Union[str, os.PathLike],
     """
 
     # Directory for processed data output
-    resstock_bldg_proc_dir = os.path.join(data_dir, 
-                                          'county_processed', 
-                                          f'upgrade={upgrade_id}')
+    res_bldg_proc_dir = os.path.join(data_dir,
+                                     'county_processed',
+                                     f'upgrade={upgrade_id}')
 
     # Create a list of building types
-    res_bldg_type_list = ['Single-Family Detached', 
-                          'Multi-Family with 5+ Units', 
-                          'Multi-Family with 2 - 4 Units', 
-                          'Mobile Home', 
+    res_bldg_type_list = ['Single-Family Detached',
+                          'Multi-Family with 5+ Units',
+                          'Multi-Family with 2 - 4 Units',
+                          'Mobile Home',
                           'Single-Family Attached']
 
     # Read pre-processed EUSS energy saving data
@@ -225,14 +234,17 @@ def read_res_building_elec_data(data_dir: Union[str, os.PathLike],
         fips = row['FIPS_CODE']
         county_id = f'G{str(fips)[:2]}0{str(fips)[2:]}0'
 
-        _, _, df_county_saving_amy2018 = get_res_load_change_county(
-            county_id, upgrade_id, res_bldg_type_list, resstock_bldg_proc_dir)
-        
-        res_county_ts = df_county_saving_amy2018['electricity'].rename(county_name)
+        _, _, df_county_saving_amy2018 = get_building_load_change_county(
+            county_id, upgrade_id, res_bldg_type_list, res_bldg_proc_dir)
+
+        res_county_ts = df_county_saving_amy2018['electricity'].rename(
+            county_name)
         res_county_ts_list.append(res_county_ts)
 
-    res_load_change_county = pd.concat(res_county_ts_list, axis=1) * -1  # Convert savings to increase
-    res_load_change_county = res_load_change_county / 1e3  # Convert from kW to MW
+    # Convert savings to increase
+    res_load_change_county = pd.concat(res_county_ts_list, axis=1) * -1
+    # Convert from kW to MW
+    res_load_change_county = res_load_change_county / 1e3
 
     return res_load_change_county
 
@@ -241,14 +253,55 @@ def read_com_building_elec_data(data_dir: Union[str, os.PathLike],
                                 upgrade_id: int,
                                 county_attrs: pd.DataFrame,
                                 ) -> pd.DataFrame:
-    
-    raise NotImplementedError
+
+    # Directory for processed data output
+    com_bldg_proc_dir = os.path.join(data_dir,
+                                     'county_processed',
+                                     f'upgrade={upgrade_id}')
+
+    # Create a list of building types
+    com_bldg_type_list = ['RetailStripmall',
+                          'SmallOffice',
+                          'RetailStandalone',
+                          'LargeOffice',
+                          'Warehouse',
+                          'SecondarySchool',
+                          'PrimarySchool',
+                          'Outpatient',
+                          'QuickServiceRestaurant',
+                          'MediumOffice',
+                          'FullServiceRestaurant',
+                          'SmallHotel',
+                          'LargeHotel',
+                          'Hospital']
+
+    # Read pre-processed EUSS energy saving data
+    com_county_ts_list = list()
+
+    for i, row in county_attrs.iterrows():
+        county_name = row['NAME']
+        fips = row['FIPS_CODE']
+        county_id = f'G{str(fips)[:2]}0{str(fips)[2:]}0'
+
+        _, _, df_county_saving_amy2018 = get_building_load_change_county(
+            county_id, upgrade_id, com_bldg_type_list, com_bldg_proc_dir)
+
+        com_county_ts = df_county_saving_amy2018['electricity'].rename(
+            county_name)
+        com_county_ts_list.append(com_county_ts)
+
+    # Convert savings to increase
+    com_load_change_county = pd.concat(com_county_ts_list, axis=1) * -1
+    # Convert from kW to MW
+    com_load_change_county = com_load_change_county / 1e3
+
+    return com_load_change_county
 
 
 def read_ev_elec_data(data_dir: Union[str, os.PathLike],
                       upgrade_id: int,
-                      county_attrs: pd.DataFrame) -> pd.DataFrame:
-    
+                      county_attrs: pd.DataFrame
+                      ) -> pd.DataFrame:
     """
     Electric vehicle energy changes due to electrification.
 
@@ -266,9 +319,10 @@ def read_ev_elec_data(data_dir: Union[str, os.PathLike],
     ev_load_change_county : pd.DataFrame
         EV load change by county
     """
-    
+
     # Create a list of EV charger types
-    charger_types = ['home_l1', 'home_l2', 'work_l1', 'work_l2', 'public_l2', 'public_l3']
+    charger_types = ['home_l1', 'home_l2', 'work_l1',
+                     'work_l2', 'public_l2', 'public_l3']
 
     ev_county_ts_list = list()
 
@@ -281,21 +335,23 @@ def read_ev_elec_data(data_dir: Union[str, os.PathLike],
         for m in range(1, 13):
             filename = f"{county_name}_County_month{m}_scen{upgrade_id}_temp_gridLoad.csv"
             ev_load = pd.read_csv(os.path.join(data_dir, filename),
-                                parse_dates=True, index_col=0)
+                                  parse_dates=True, index_col=0)
 
-            # Sum by charger types and resample to hourly        
-            ev_load_total = ev_load[charger_types].sum(axis=1).resample('H').sum()
+            # Sum by charger types and resample to hourly
+            ev_load_total = ev_load[charger_types].sum(
+                axis=1).resample('H').sum()
 
             monthly_list.append(ev_load_total)
-        
+
         ev_county_ts = pd.concat(monthly_list, axis=0).rename(county_name)
         ev_county_ts_list.append(ev_county_ts)
 
     ev_load_change_county = pd.concat(ev_county_ts_list, axis=1)
-    ev_load_change_county = ev_load_change_county / 1e3  # Convert from kW to MW
+
+    # Convert from kW to MW
+    ev_load_change_county = ev_load_change_county / 1e3
 
     return ev_load_change_county
-
 
 
 def read_electrification_data(electrification_dict: Dict[str, Any],
@@ -336,20 +392,20 @@ def read_electrification_data(electrification_dict: Dict[str, Any],
         'com_building': read_com_building_elec_data,
         'electric_vehicle': read_ev_elec_data
     }
-    
+
     for sector, attrs in electrification_dict.items():
         if sector in process_functions:
             print(f"Processing {sector} electrification data...")
             func = process_functions[sector]
-            load_change_county = func(data_dir=attrs['data_dir'], 
-                                      upgrade_id=attrs['upgrade_id'], 
+            load_change_county = func(data_dir=attrs['data_dir'],
+                                      upgrade_id=attrs['upgrade_id'],
                                       county_attrs=county_attrs)
             load_change_bus = agg_demand_county2bus(load_change_county,
                                                     county_2_bus)
             electrification_dict[sector]['load_change'] = load_change_bus
         else:
             raise ValueError(f"Invalid sector: {sector}")
-    
+
     return electrification_dict
 
 
@@ -358,7 +414,8 @@ def run_nygrid_one_day(s_time: pd.Timestamp,
                        grid_data: Dict[str, pd.DataFrame],
                        grid_data_dir: Union[str, os.PathLike],
                        opts: Dict[str, Any],
-                       init_gen: Union[np.ndarray, None]) -> Dict[str, pd.DataFrame]:
+                       init_gen: Union[np.ndarray, None]
+                       ) -> Dict[str, pd.DataFrame]:
     """
     Run NYGrid simulation for one day
 
@@ -397,7 +454,8 @@ def run_nygrid_one_day(s_time: pd.Timestamp,
     nygrid_sim.set_gen_max_sch(grid_data['genmax_profile'])
     nygrid_sim.set_gen_min_sch(grid_data['genmin_profile'])
     nygrid_sim.set_gen_ramp_sch(grid_data['genramp30_profile'])
-    nygrid_sim.set_gen_cost_sch(grid_data['gencost0_profile'], grid_data['gencost1_profile'])
+    nygrid_sim.set_gen_cost_sch(
+        grid_data['gencost0_profile'], grid_data['gencost1_profile'])
 
     if grid_data.get('genmax_profile_vre', None) is not None:
         nygrid_sim.set_vre_max_sch(grid_data['genmax_profile_vre'])

@@ -4,9 +4,9 @@ import typing
 from typing import List, Tuple, Optional
 
 
-def plot_gen(thermal_pg: pd.Series, 
-             gen_hist: pd.Series, 
-             gen_max: pd.Series, 
+def plot_gen(thermal_pg: pd.Series,
+             gen_hist: pd.Series,
+             gen_max: pd.Series,
              gen_min: pd.Series,
              ax: plt.Axes,
              title: Optional[str] = None) -> plt.Axes:

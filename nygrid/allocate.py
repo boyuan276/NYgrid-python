@@ -64,7 +64,7 @@ def nearest_neighbor_lat_lon(left_gdf: gpd.GeoDataFrame,
                              leaf_size: int = 20) -> Union[Dict, Tuple]:
     """
     For each point in left_gdf, find closest point in right GeoDataFrame and return them.
-    
+
     NOTICE: Assumes that the input Points are in WGS84 projection (lat/lon).
 
     Parameters
@@ -110,7 +110,7 @@ def nearest_neighbor_lat_lon(left_gdf: gpd.GeoDataFrame,
     # Ensure that the index corresponds the one in left_gdf
     closest_points = closest_points.reset_index(drop=True)
 
-    # Add distance if requested 
+    # Add distance if requested
     if return_dist:
         # Convert to meters from radians
         earth_radius = 6371000  # meters
@@ -125,7 +125,7 @@ def nearest_neighbor_meters(left_gdf: gpd.GeoDataFrame,
                             leaf_size: int = 20) -> Union[Dict, Tuple]:
     """
     For each point in left_gdf, find the closest point in right GeoDataFrame and return them.
-    
+
     NOTICE: Assumes that the input Points are in WGS84 projection (meters).
 
     Parameters
@@ -151,16 +151,19 @@ def nearest_neighbor_meters(left_gdf: gpd.GeoDataFrame,
     # Ensure that index in right gdf is formed of sequential numbers
     right = right_gdf.copy().reset_index(drop=True)
 
-    # Parse coordinates from points and insert them into a numpy array as METERS   
-    left_meters = np.array(left_gdf[left_geom_col].apply(lambda geom: (geom.x, geom.y)).to_list())
-    right_meters = np.array(right[right_geom_col].apply(lambda geom: (geom.x, geom.y)).to_list())
+    # Parse coordinates from points and insert them into a numpy array as METERS
+    left_meters = np.array(left_gdf[left_geom_col].apply(
+        lambda geom: (geom.x, geom.y)).to_list())
+    right_meters = np.array(right[right_geom_col].apply(
+        lambda geom: (geom.x, geom.y)).to_list())
 
     # Find the nearest points
     # -----------------------
     # closest ==> index in right_gdf that corresponds to the closest point
     # dist ==> distance between the nearest neighbors (in meters)
 
-    closest, dist = get_nearest(src_points=left_meters, candidates=right_meters, leaf_size=leaf_size)
+    closest, dist = get_nearest(
+        src_points=left_meters, candidates=right_meters, leaf_size=leaf_size)
 
     # Return points from right GeoDataFrame that are closest to points in left GeoDataFrame
     closest_points = right.loc[closest]
@@ -168,7 +171,7 @@ def nearest_neighbor_meters(left_gdf: gpd.GeoDataFrame,
     # Ensure that the index corresponds the one in left_gdf
     closest_points = closest_points.reset_index(drop=True)
 
-    # Add distance if requested 
+    # Add distance if requested
     if return_dist:
         # Convert to meters from radians
         # earth_radius = 6371000  # meters

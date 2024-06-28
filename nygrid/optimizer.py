@@ -179,7 +179,8 @@ class Optimizer:
         # ESR energy cost
         def esr_cost_ene_expr(model):
             return sum(self.nygrid.esrcost_crg[t, esr] * model.esrPCrg[t, esr]
-                       + self.nygrid.esrcost_dis[t, esr] * model.esrPDis[t, esr]
+                       + self.nygrid.esrcost_dis[t,
+                                                 esr] * model.esrPDis[t, esr]
                        for esr in self.esrs for t in self.times)
 
         def over_gen_penalty_expr(model):
@@ -439,7 +440,8 @@ class Optimizer:
                 if self.nygrid.esr_init is not None:
                     return model.esrSOC[t, esr] == self.nygrid.esr_init[esr] \
                         + model.esrPCrg[t, esr] * self.nygrid.esr_crg_eff[t, esr] \
-                        - model.esrPDis[t, esr] / self.nygrid.esr_dis_eff[t, esr]
+                        - model.esrPDis[t, esr] / \
+                        self.nygrid.esr_dis_eff[t, esr]
                 else:
                     return pyo.Constraint.Skip
             else:

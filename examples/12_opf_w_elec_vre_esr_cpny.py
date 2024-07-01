@@ -4,7 +4,8 @@ Run multi-period OPF with 2018 data.
 Add CPNY and CHPE HVDC lines.
 Add 6 GW ESRs.
 Add future solar and offshore wind.
-Add residential building electrification.
+Add residential building, commercial building,
+and electric vehicle electrification.
 """
 # %% Packages
 
@@ -16,13 +17,14 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from nygrid.run_nygrid import read_grid_data, read_vre_data, read_electrification_data, run_nygrid_one_day
+from nygrid.run_nygrid import (read_grid_data, read_vre_data,
+                               read_electrification_data, run_nygrid_one_day)
 
 if __name__ == '__main__':
 
     # %% Simulation settings
     # NOTE: Change the following settings to run the simulation
-    sim_name = 'w_elec_vre_esr_cpny'
+    sim_name = '2030CLCPA'
     leading_hours = 12
     w_cpny = True  # True: add CPNY and CHPE HVDC lines; False: no CPNY and CHPE HVDC lines
     w_esr = True  # True: add ESRs; False: no ESRs
@@ -53,7 +55,7 @@ if __name__ == '__main__':
     else:
         data_dir = os.path.join(cwd, 'data')
 
-    grid_data_dir = os.path.join(data_dir, 'grid')
+    grid_data_dir = os.path.join(data_dir, 'grid', '2030CLCPA')
     if not os.path.exists(grid_data_dir):
         raise FileNotFoundError('Grid data directory not found.')
 
@@ -65,17 +67,11 @@ if __name__ == '__main__':
     results_dir = os.path.join(os.path.dirname(data_dir), 'results')
     logging.info('Results directory: {}'.format(results_dir))
 
-    solar_data_dir = os.path.join(data_dir, 'solar')
-    print('Solar data directory: {}'.format(solar_data_dir))
+    renewable_data_dir = os.path.join(data_dir, 'renewable')
+    print('Renewable data directory: {}'.format(renewable_data_dir))
 
-    onshore_wind_data_dir = os.path.join(data_dir, 'onshore_wind')
-    print('Onshore wind data directory: {}'.format(onshore_wind_data_dir))
-
-    offshore_wind_data_dir = os.path.join(data_dir, 'offshore_wind')
-    print('Offshore wind data directory: {}'.format(offshore_wind_data_dir))
-
-    buildings_data_dir = os.path.join(data_dir, 'buildings')
-    print('Buildings data directory: {}'.format(buildings_data_dir))
+    load_data_dir = os.path.join(data_dir, 'load')
+    print('Load data directory: {}'.format(load_data_dir))
 
     sim_results_dir = os.path.join(results_dir, sim_name)
     if not os.path.exists(sim_results_dir):
@@ -88,18 +84,19 @@ if __name__ == '__main__':
 
     # Read DC line property file
     filename = os.path.join(grid_data_dir, 'dcline_prop.csv')
-    dcline_prop = pd.read_csv(filename, index_col=0)
+    dcline_prop = pd.read_csv(filename)
 
     if w_cpny:
         grid_data['dcline_prop'] = dcline_prop
-        logging.info('With CPNY and CHPE HVDC lines.')  # Existing and planned HVDC lines
+        # Existing and planned HVDC lines
+        logging.info('With CPNY and CHPE HVDC lines.')
     else:
         grid_data['dcline_prop'] = dcline_prop[:4]  # Only existing HVDC lines
         logging.info('Without CPNY and CHPE HVDC lines.')
 
     # Read ESR property file
     filename = os.path.join(grid_data_dir, 'esr_prop.csv')
-    esr_prop = pd.read_csv(filename, index_col=0)
+    esr_prop = pd.read_csv(filename)
 
     if w_esr:
         logging.info('With ESRs.')
@@ -110,24 +107,87 @@ if __name__ == '__main__':
 
     # Read renewable generation profiles
     if w_vre:
-        vre_prop, genmax_profile_vre = read_vre_data(solar_data_dir, onshore_wind_data_dir, offshore_wind_data_dir)
+        solar_data_dir = os.path.join(data_dir, 'renewable', 'solar')
+        logging.info('Solar data directory: {}'.format(solar_data_dir))
+
+        onshore_wind_data_dir = os.path.join(
+            data_dir, 'renewable', 'onshore_wind')
+        logging.info('Onshore wind data directory: {}'.format(
+            onshore_wind_data_dir))
+
+        offshore_wind_data_dir = os.path.join(
+            data_dir, 'renewable', 'offshore_wind')
+        logging.info('Offshore wind data directory: {}'.format(
+            offshore_wind_data_dir))
+
+        vre_prop, genmax_profile_vre = read_vre_data(solar_data_dir,
+                                                     onshore_wind_data_dir,
+                                                     offshore_wind_data_dir)
         grid_data['vre_prop'] = vre_prop
         grid_data['genmax_profile_vre'] = genmax_profile_vre
         # NOTE: Make datetime index consistent
         grid_data['genmax_profile_vre'].index = grid_data['genmax_profile'].index
         logging.info('With future solar and offshore wind.')
+
     else:
         logging.info('No future solar and offshore wind.')
-        grid_data['vre_prop'] = None
-        grid_data['genmax_profile_vre'] = None
 
     # Read residential building electrification profiles
     if w_elec:
-        logging.info('With residential building electrification.')
-        res_load_change_bus = read_electrification_data(buildings_data_dir)
-        res_load_change_bus = res_load_change_bus * elec_ratio
-        load_profile_elec = grid_data['load_profile'].add(res_load_change_bus, fill_value=0)
+        res_building_data_dir = os.path.join(
+            data_dir, 'load', 'residential_building')
+        logging.info('Residential buildings data directory: {}'.format(
+            res_building_data_dir))
+
+        com_building_data_dir = os.path.join(
+            data_dir, 'load', 'commercial_building')
+        print('Commercial buildings data directory: {}'.format(
+            com_building_data_dir))
+
+        electric_vehicle_data_dir = os.path.join(
+            data_dir, 'load', 'electric_vehicle')
+        print('Electric vehicle data directory: {}'.format(
+            electric_vehicle_data_dir))
+
+        # Read NYS county attributes and county to bus mapping
+        county_attrs = pd.read_csv(os.path.join(
+            load_data_dir, 'county_attributes.csv'))
+        county_2_bus = pd.read_csv(os.path.join(
+            load_data_dir, 'county_2_bus.csv'))
+
+        electrification_dict = {
+            'res_building': {
+                'data_dir': res_building_data_dir,
+                'upgrade_id': 10,
+                'scaling_factor': 0.375
+            },
+            'com_building': {
+                'data_dir': com_building_data_dir,
+                'upgrade_id': 18,
+                'scaling_factor': 0.375
+            },
+            'electric_vehicle': {
+                'data_dir': electric_vehicle_data_dir,
+                'upgrade_id': 0,
+                'scaling_factor': 0.375
+            }
+        }
+
+        electrification_dict = read_electrification_data(electrification_dict,
+                                                         county_attrs,
+                                                         county_2_bus)
+
+        load_profile_elec = grid_data['load_profile'].copy()
+
+        for sector, attrs in electrification_dict.items():
+            load_change = attrs['load_change'] * attrs['scaling_factor']
+            load_profile_elec = load_profile_elec.add(
+                load_change, fill_value=0)
+
+        load_profile_elec = load_profile_elec.sort_index(axis=1)
+        load_profile_elec = load_profile_elec.round(2)
         grid_data['load_profile'] = load_profile_elec
+
     else:
         logging.info('No residential building electrification.')
 
@@ -147,15 +207,22 @@ if __name__ == '__main__':
     for d in range(len(timestamp_list)):
         t = time.time()
 
+        # Remove leading hours for the last day
+        if d == len(timestamp_list) - 1:
+            leading_hours = 0
+
         # Run OPF for one day (24 hours) plus leading hours
         # The first day is valid, the leading hours are used to dispatch batteries properly
         start_datetime = timestamp_list[d]
-        end_datetime = start_datetime + timedelta(hours=24 + leading_hours)
+        end_datetime = start_datetime + timedelta(hours=23 + leading_hours)
 
-        nygrid_results = run_nygrid_one_day(start_datetime, end_datetime, grid_data, grid_data_dir, options, last_gen)
+        nygrid_results = run_nygrid_one_day(start_datetime, end_datetime,
+                                            grid_data, grid_data_dir,
+                                            options, last_gen)
 
         # Set generator initial condition for the next iteration
-        last_gen = nygrid_results['PG'].loc[start_datetime].to_numpy().squeeze()
+        last_gen = nygrid_results['PG'].loc[start_datetime].to_numpy(
+        ).squeeze()
 
         # Save simulation nygrid_results to pickle
         filename = f'nygrid_sim_{sim_name}_{start_datetime.strftime("%Y%m%d%H")}.pkl'
@@ -164,8 +231,10 @@ if __name__ == '__main__':
         logging.info(f'Saved simulation nygrid_results in {filename}')
 
         elapsed = time.time() - t
-        logging.info(f'Finished running for {start_datetime.strftime("%Y-%m-%d")}. Elapsed time: {elapsed:.2f} seconds')
+        logging.info(
+            f'Finished running for {start_datetime.strftime("%Y-%m-%d")}. Elapsed time: {elapsed:.2f} seconds')
         logging.info('-' * 80)
 
     tot_elapsed = time.time() - prog_start
-    logging.info(f"Finished multi-period OPF simulation {sim_name}. Total elapsed time: {tot_elapsed:.2f} seconds")
+    logging.info(
+        f"Finished multi-period OPF simulation {sim_name}. Total elapsed time: {tot_elapsed:.2f} seconds")

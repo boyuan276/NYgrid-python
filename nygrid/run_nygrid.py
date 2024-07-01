@@ -33,6 +33,8 @@ def read_grid_data(data_dir: Union[str, os.PathLike],
     # Read load profile
     load_profile = pd.read_csv(os.path.join(data_dir, f'load_profile_{year}.csv'),
                                parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+    # Remove 'Bus' prefix in column names
+    load_profile.columns = load_profile.columns.str.replace('Bus', '').astype(int)
 
     # Read generation profile
     gen_profile = pd.read_csv(os.path.join(data_dir, f'gen_profile_{year}.csv'),
@@ -454,8 +456,8 @@ def run_nygrid_one_day(s_time: pd.Timestamp,
     nygrid_sim.set_gen_max_sch(grid_data['genmax_profile'])
     nygrid_sim.set_gen_min_sch(grid_data['genmin_profile'])
     nygrid_sim.set_gen_ramp_sch(grid_data['genramp30_profile'])
-    nygrid_sim.set_gen_cost_sch(
-        grid_data['gencost0_profile'], grid_data['gencost1_profile'])
+    nygrid_sim.set_gen_cost_sch(grid_data['gencost0_profile'],
+                                grid_data['gencost1_profile'])
 
     if grid_data.get('genmax_profile_vre', None) is not None:
         nygrid_sim.set_vre_max_sch(grid_data['genmax_profile_vre'])

@@ -1,0 +1,31 @@
+# List your directory paths in this file; the others will be dependent on these.
+directory_paths:
+  nygrid_home: '/mnt/Bo_HDD/NYgrid-python/'
+  nygrid_data: '/mnt/Bo_HDD/NYgrid-python/data/'
+  grid_data_dir: '/mnt/Bo_HDD/NYgrid-python/data/grid/'
+  load_data_dir: '/mnt/Bo_HDD/NYgrid-python/data/load/'
+  renewable_data_dir: '/mnt/Bo_HDD/NYgrid-python/data/renewable/'
+  gis_data_dir: '/mnt/Bo_HDD/NYgrid-python/data/gis/'
+grid_property_files:
+  bus_prop: 'bus_prop.csv'
+  gen_prop: 'gen_prop.csv'
+  genfuel_prop: 'genfuel_prop.csv'
+  gencost_prop: 'gencost_prop.csv'
+  branch_prop: 'branch_prop.csv'
+  if_lims_prop: 'if_lims_prop.csv'
+  if_map_prop: 'if_map_prop.csv'
+  esr_prop: 'esr_prop.csv'
+  dcline_prop: 'dcline_prop.csv'
+grid_profile_files:
+  load_profile: 'load_profile_2018.csv'
+  gen_profile: 'gen_profile_2018.csv'
+  genmax_profile: 'genmax_profile_2018.csv'
+  genmin_profile: 'genmin_profile_2018.csv'
+  genramp30_profile: 'genramp30_profile_2018.csv'
+  gencost0_profile: 'gencost0_profile_2018.csv'
+  gencost1_profile: 'gencost1_profile_2018.csv'
+renewable_profile_files:
+  current_solar_profile: 'current_solar_gen_1hr.csv'
+  future_solar_profile: 'future_solar_gen_1hr.csv'
+  onshore_wind_profile: 'current_wind_gen_1hr.csv'
+  offshore_wind_profile: 'power_load_2018.csv'

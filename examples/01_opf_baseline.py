@@ -22,7 +22,7 @@ if __name__ == '__main__':
 
     # %% Simulation settings
     # NOTE: Change the following settings to run the simulation
-    sim_name = 'baseline'
+    sim_name = '2018Baseline'
     leading_hours = 12
     w_cpny = False  # True: add CPNY and CHPE HVDC lines; False: no CPNY and CHPE HVDC lines
     w_esr = False  # True: add ESRs; False: no ESRs
@@ -50,7 +50,7 @@ if __name__ == '__main__':
     else:
         data_dir = os.path.join(cwd, 'data')
 
-    grid_data_dir = os.path.join(data_dir, 'grid')
+    grid_data_dir = os.path.join(data_dir, 'grid', '2018Base')
     if not os.path.exists(grid_data_dir):
         raise FileNotFoundError('Grid data directory not found.')
 
@@ -73,7 +73,7 @@ if __name__ == '__main__':
 
     # Read DC line property file
     filename = os.path.join(grid_data_dir, 'dcline_prop.csv')
-    dcline_prop = pd.read_csv(filename, index_col=0)
+    dcline_prop = pd.read_csv(filename)
 
     if w_cpny:
         grid_data['dcline_prop'] = dcline_prop
@@ -84,7 +84,7 @@ if __name__ == '__main__':
 
     # Read ESR property file
     filename = os.path.join(grid_data_dir, 'esr_prop.csv')
-    esr_prop = pd.read_csv(filename, index_col=0)
+    esr_prop = pd.read_csv(filename)
 
     if w_esr:
         logging.info('With ESRs.')
@@ -109,10 +109,14 @@ if __name__ == '__main__':
     for d in range(len(timestamp_list)):
         t = time.time()
 
+        # Remove leading hours for the last day
+        if d == len(timestamp_list) - 1:
+            leading_hours = 0
+
         # Run OPF for one day (24 hours) plus leading hours
         # The first day is valid, the leading hours are used to dispatch batteries properly
         start_datetime = timestamp_list[d]
-        end_datetime = start_datetime + timedelta(hours=24 + leading_hours)
+        end_datetime = start_datetime + timedelta(hours=23 + leading_hours)
 
         nygrid_results = run_nygrid_one_day(start_datetime, end_datetime, grid_data, grid_data_dir, options, last_gen)
 

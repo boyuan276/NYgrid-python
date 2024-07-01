@@ -50,7 +50,8 @@ def check_status(results: SolverResults) -> bool:
     return True
 
 
-def read_grid_data(grid_data_dir: Union[str, os.PathLike]) -> Dict[str, pd.DataFrame]:
+def read_grid_data(grid_data_dir: Union[str, os.PathLike]
+                   ) -> Dict[str, pd.DataFrame]:
     """
     Read grid data from csv files.
 
@@ -63,42 +64,44 @@ def read_grid_data(grid_data_dir: Union[str, os.PathLike]) -> Dict[str, pd.DataF
     -------
     grid_data: dict
         Dictionary of grid data.
-        Keys: bus_prop, gen_prop, gen_fuel, gencost_prop, branch_prop, if_lim_prop, if_map_prop, storage_prop
+        Keys: bus_prop, gen_prop, gen_fuel, gencost_prop, 
+              branch_prop, if_lim_prop, if_map_prop, 
+              storage_prop, dcline_prop
         Values: pandas.DataFrame
     """
 
     # Read bus properties
     filename = os.path.join(grid_data_dir, 'bus_prop.csv')
     if os.path.exists(filename):
-        bus_prop = pd.read_csv(filename, index_col=0)
+        bus_prop = pd.read_csv(filename)
     else:
         raise ValueError('Bus properties file does not exist.')
 
     # Read generator properties
     filename = os.path.join(grid_data_dir, 'gen_prop.csv')
     if os.path.exists(filename):
-        gen_prop = pd.read_csv(filename, index_col=0)
+        gen_prop = pd.read_csv(filename)
     else:
         raise ValueError('Generator properties file does not exist.')
 
     # Read generator fuel type
     filename = os.path.join(grid_data_dir, 'genfuel_prop.csv')
     if os.path.exists(filename):
-        gen_fuel = pd.read_csv(filename, index_col=0)
+        gen_fuel = pd.read_csv(filename)
     else:
         raise ValueError('Generator fuel type file does not exist.')
 
     # Read generator cost properties
     filename = os.path.join(grid_data_dir, 'gencost_prop.csv')
     if os.path.exists(filename):
-        gencost_prop = pd.read_csv(filename, index_col=0)
+        gencost_prop = pd.read_csv(filename)
     else:
         raise ValueError('Generator cost properties file does not exist.')
 
     # Read AC line properties
     filename = os.path.join(grid_data_dir, 'branch_prop.csv')
     if os.path.exists(filename):
-        branch_prop = pd.read_csv(filename, index_col=0)
+        branch_prop = pd.read_csv(filename)
         # Replace default 0 (unlimited) with 9999
         branch_prop.loc[branch_prop['RATE_A'] == 0, 'RATE_A'] = 9999
     else:
@@ -107,21 +110,21 @@ def read_grid_data(grid_data_dir: Union[str, os.PathLike]) -> Dict[str, pd.DataF
     # Read interface properties
     filename = os.path.join(grid_data_dir, 'if_lims_prop.csv')
     if os.path.exists(filename):
-        if_lim_prop = pd.read_csv(filename, index_col=0)
+        if_lim_prop = pd.read_csv(filename)
     else:
         raise ValueError('Interface limit properties file does not exist.')
 
     # Read interface mapping
     filename = os.path.join(grid_data_dir, 'if_map_prop.csv')
     if os.path.exists(filename):
-        if_map_prop = pd.read_csv(filename, index_col=0)
+        if_map_prop = pd.read_csv(filename)
     else:
         raise ValueError('Interface mapping file does not exist.')
 
     # Read storage properties (Optional)
     filename = os.path.join(grid_data_dir, 'esr_prop.csv')
     if os.path.exists(filename):
-        storage_prop = pd.read_csv(filename, index_col=0)
+        storage_prop = pd.read_csv(filename)
     else:
         Warning('No storage properties are provided.')
         storage_prop = None
@@ -129,7 +132,7 @@ def read_grid_data(grid_data_dir: Union[str, os.PathLike]) -> Dict[str, pd.DataF
     # Read DC line properties (Optional)
     filename = os.path.join(grid_data_dir, 'dcline_prop.csv')
     if os.path.isfile(filename):
-        dcline_prop = pd.read_csv(filename, index_col=0)
+        dcline_prop = pd.read_csv(filename)
     else:
         Warning('No DC line properties are provided.')
         dcline_prop = None
@@ -440,10 +443,10 @@ class NYGrid:
         self.ppc['version'] = '2'
         self.ppc['bus'] = self.grid_data['bus_prop'].drop(columns=['BUS_ZONE']).to_numpy()
         self.ppc['gen'] = self.grid_data['gen_prop'].drop(columns=['GEN_NAME', 'GEN_ZONE', 'GEN_FUEL']).to_numpy()
-        self.ppc['genfuel'] = self.grid_data['gen_fuel'].to_numpy()
-        self.ppc['gencost'] = self.grid_data['gencost_prop'].to_numpy()
+        self.ppc['genfuel'] = self.grid_data['gen_fuel'].drop(columns=['GEN_NAME']).to_numpy()
+        self.ppc['gencost'] = self.grid_data['gencost_prop'].drop(columns=['GEN_NAME']).to_numpy()
         self.ppc['branch'] = self.grid_data['branch_prop'].drop(columns=['FROM_ZONE', 'TO_ZONE']).to_numpy()
-        self.ppc['dcline'] = self.grid_data['dcline_prop'].drop(columns=['FROM_ZONE', 'TO_ZONE']).to_numpy()
+        self.ppc['dcline'] = self.grid_data['dcline_prop'].drop(columns=['DC_NAME', 'FROM_ZONE', 'TO_ZONE']).to_numpy()
         self.ppc['if'] = {'lims': self.grid_data['if_lim_prop'].drop(columns=['FROM_ZONE', 'TO_ZONE']).to_numpy(),
                           'map': self.grid_data['if_map_prop'].drop(columns=['BR_IDX', 'BR_DIR']).to_numpy()}
 

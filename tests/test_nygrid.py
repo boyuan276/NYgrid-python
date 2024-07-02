@@ -11,7 +11,7 @@ if 'tests' in cwd:
 else:
     data_dir = os.path.join(cwd, 'data')
 
-grid_data_dir = os.path.join(data_dir, 'grid', '2018Baseline')
+grid_data_dir = os.path.join(data_dir, 'grid')
 if not os.path.exists(grid_data_dir):
     raise FileNotFoundError('Grid data directory not found.')
 

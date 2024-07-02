@@ -104,6 +104,7 @@ if __name__ == '__main__':
 
     # No initial condition for the first day
     last_gen = None
+    last_soc = None
 
     # Loop through all days
     for d in range(len(timestamp_list)):

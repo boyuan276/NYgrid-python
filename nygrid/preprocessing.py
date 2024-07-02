@@ -51,17 +51,15 @@ def agg_demand_county2bus(demand_inc_county: pd.DataFrame,
     demand_inc_bus_westchester['78'] = demand_inc_bus_westchester['Westchester'] * 0.5
     demand_inc_bus_westchester = demand_inc_bus_westchester.drop(columns=[
                                                                  'Westchester'])
-    demand_inc_bus_westchester.columns = demand_inc_bus_westchester.columns.astype(
-        int)
+    demand_inc_bus_westchester.columns = demand_inc_bus_westchester.columns.astype(int)
 
-    county_bus_alloc_rest = county2bus_rest.set_index('NAME').to_dict()[
-        'busIdx']
+    county_bus_alloc_rest = county2bus_rest.set_index('NAME').to_dict()['busIdx']
     demand_inc_bus_rest = demand_inc_county_rest.T.groupby(
         county_bus_alloc_rest).sum().T
 
     demand_inc_bus = demand_inc_bus_rest.add(demand_inc_bus_erie, fill_value=0)
-    demand_inc_bus = demand_inc_bus.add(
-        demand_inc_bus_westchester, fill_value=0)
+    demand_inc_bus = demand_inc_bus.add(demand_inc_bus_westchester, fill_value=0)
+    demand_inc_bus.columns = demand_inc_bus.columns.astype(int)
 
     return demand_inc_bus
 

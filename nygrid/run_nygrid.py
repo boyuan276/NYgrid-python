@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 import pickle
-from typing import Union, Dict, Tuple, Any
+from typing import Union, Dict, Tuple, Any, Optional
 
 from nygrid.nygrid import NYGrid
 from nygrid.preprocessing import agg_demand_county2bus, get_building_load_change_county
@@ -33,6 +33,8 @@ def read_grid_data(data_dir: Union[str, os.PathLike],
     # Read load profile
     load_profile = pd.read_csv(os.path.join(data_dir, f'load_profile_{year}.csv'),
                                parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+    # Remove 'Bus' prefix in column names
+    load_profile.columns = load_profile.columns.str.replace('Bus', '').astype(int)
 
     # Read generation profile
     gen_profile = pd.read_csv(os.path.join(data_dir, f'gen_profile_{year}.csv'),
@@ -414,7 +416,8 @@ def run_nygrid_one_day(s_time: pd.Timestamp,
                        grid_data: Dict[str, pd.DataFrame],
                        grid_data_dir: Union[str, os.PathLike],
                        opts: Dict[str, Any],
-                       init_gen: Union[np.ndarray, None]
+                       init_gen: Optional[np.ndarray],
+                       init_soc: Optional[np.ndarray]
                        ) -> Dict[str, pd.DataFrame]:
     """
     Run NYGrid simulation for one day
@@ -433,6 +436,8 @@ def run_nygrid_one_day(s_time: pd.Timestamp,
         Dictionary of options
     init_gen : numpy.ndarray
         Generator initial condition
+    init_soc : numpy.ndarray
+        ESR initial state of charge
 
     Returns
     -------
@@ -454,8 +459,8 @@ def run_nygrid_one_day(s_time: pd.Timestamp,
     nygrid_sim.set_gen_max_sch(grid_data['genmax_profile'])
     nygrid_sim.set_gen_min_sch(grid_data['genmin_profile'])
     nygrid_sim.set_gen_ramp_sch(grid_data['genramp30_profile'])
-    nygrid_sim.set_gen_cost_sch(
-        grid_data['gencost0_profile'], grid_data['gencost1_profile'])
+    nygrid_sim.set_gen_cost_sch(grid_data['gencost0_profile'],
+                                grid_data['gencost1_profile'])
 
     if grid_data.get('genmax_profile_vre', None) is not None:
         nygrid_sim.set_vre_max_sch(grid_data['genmax_profile_vre'])
@@ -465,6 +470,9 @@ def run_nygrid_one_day(s_time: pd.Timestamp,
 
     # Set generator initial condition
     nygrid_sim.set_gen_init_data(gen_init=init_gen)
+
+    # Set ESR initial condition
+    nygrid_sim.set_esr_init_data(esr_init=init_soc)
 
     # Set options
     nygrid_sim.set_options(opts)

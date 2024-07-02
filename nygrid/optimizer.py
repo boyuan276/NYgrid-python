@@ -157,6 +157,19 @@ class Optimizer:
         self.model.esrSOC = pyo.Var(self.times, self.esrs,
                                     within=pyo.NonNegativeReals, initialize=0)
 
+        self.model.s_esr_pcrg = pyo.Var(self.times, self.esrs,
+                                        within=pyo.NonNegativeReals, initialize=0)
+        self.model.s_esr_pdis = pyo.Var(self.times, self.esrs,
+                                        within=pyo.NonNegativeReals, initialize=0)
+        self.model.s_esr_soc_min = pyo.Var(self.times, self.esrs,
+                                           within=pyo.NonNegativeReals, initialize=0)
+        self.model.s_esr_soc_max = pyo.Var(self.times, self.esrs,
+                                           within=pyo.NonNegativeReals, initialize=0)
+        self.model.s_esr_soc_overt = pyo.Var(self.times, self.esrs,
+                                             within=pyo.NonNegativeReals, initialize=0)
+        self.model.s_esr_soc_undert = pyo.Var(self.times, self.esrs,
+                                              within=pyo.NonNegativeReals, initialize=0)
+
     def add_vars_dual(self):
 
         # Dual variables for price information
@@ -178,9 +191,8 @@ class Optimizer:
 
         # ESR energy cost
         def esr_cost_ene_expr(model):
-            return sum(self.nygrid.esrcost_crg[t, esr] * model.esrPCrg[t, esr]
-                       + self.nygrid.esrcost_dis[t,
-                                                 esr] * model.esrPDis[t, esr]
+            return sum(- self.nygrid.esrcost_crg[t, esr] * model.esrPCrg[t, esr]
+                       + self.nygrid.esrcost_dis[t, esr] * model.esrPDis[t, esr]
                        for esr in self.esrs for t in self.times)
 
         def over_gen_penalty_expr(model):
@@ -217,13 +229,36 @@ class Optimizer:
             return sum(model.s_br_min[t, n]
                        for n in self.branches for t in self.times) * self.nygrid.PenaltyForBranchMwViolation
 
-        self.model.obj = pyo.Objective(expr=(gen_cost_ene_expr(self.model)
-                                             + esr_cost_ene_expr(self.model)
-                                             + over_gen_penalty_expr(self.model) + load_shed_penalty_expr(self.model)
-                                             + ramp_down_penalty_expr(self.model) + ramp_up_penalty_expr(self.model)
-                                             + if_max_penalty_expr(self.model) + if_min_penalty_expr(self.model)
-                                             + br_max_penalty_expr(self.model)) + br_min_penalty_expr(self.model),
-                                       sense=pyo.minimize)
+        def esr_pcrg_penalty_expr(model):
+            return sum(model.s_esr_pcrg[t, esr]
+                          for esr in self.esrs for t in self.times) * self.nygrid.PenaltyForESRPowerViolation
+        def esr_pdis_penalty_expr(model):
+            return sum(model.s_esr_pdis[t, esr]
+                          for esr in self.esrs for t in self.times) * self.nygrid.PenaltyForESRPowerViolation
+        def esr_soc_max_penalty_expr(model):
+            return sum(model.s_esr_soc_max[t, esr]
+                          for esr in self.esrs for t in self.times) * self.nygrid.PenaltyForESRSOCViolation
+        def esr_soc_min_penalty_expr(model):
+            return sum(model.s_esr_soc_min[t, esr]
+                          for esr in self.esrs for t in self.times) * self.nygrid.PenaltyForESRSOCViolation
+        def esr_soc_overt_penalty_expr(model):
+            return sum(model.s_esr_soc_overt[t, esr]
+                          for esr in self.esrs for t in self.times) * self.nygrid.PenaltyForESRSOCViolation
+        def esr_soc_undert_penalty_expr(model):
+            return sum(model.s_esr_soc_undert[t, esr]
+                          for esr in self.esrs for t in self.times) * self.nygrid.PenaltyForESRSOCViolation
+        
+        self.model.obj = pyo.Objective(expr=(
+            gen_cost_ene_expr(self.model)
+            + esr_cost_ene_expr(self.model)
+            + over_gen_penalty_expr(self.model) + load_shed_penalty_expr(self.model)
+            + ramp_down_penalty_expr(self.model) + ramp_up_penalty_expr(self.model)
+            + if_max_penalty_expr(self.model) + if_min_penalty_expr(self.model)
+            + br_max_penalty_expr(self.model) + br_min_penalty_expr(self.model)
+            + esr_pcrg_penalty_expr(self.model) + esr_pdis_penalty_expr(self.model)
+            + esr_soc_max_penalty_expr(self.model) + esr_soc_min_penalty_expr(self.model)
+            + esr_soc_overt_penalty_expr(self.model) + esr_soc_undert_penalty_expr(self.model)
+        ), sense=pyo.minimize)
 
         logging.debug('Added objective function.')
 
@@ -303,49 +338,50 @@ class Optimizer:
         None
         """
 
-        if not self.nygrid.UsePTDF:
-            # 1.1. DC power flow constraint
-            def dc_power_flow_rule(model, t, b):
-                return sum(self.nygrid.gen_map[b, g] * model.PG[t, g] for g in self.generators) \
-                    - sum(self.nygrid.load_map[b, ld] * self.model.PL[t, ld] for ld in self.loads) \
-                    == sum(self.nygrid.B[b, b_] * model.VA[t, b_] for b_ in self.buses)
-
-            self.model.c_pf = pyo.Constraint(self.times, self.buses,
-                                             rule=dc_power_flow_rule)
-
-            # 1.2. Branch flow definition
-            def branch_flow_rule(model, t, br):
-                return model.PF[t, br] == sum(self.nygrid.Bf[br, b] * model.VA[t, b]
-                                              for b in self.buses)
-
-            self.model.c_br_flow = pyo.Constraint(self.times, self.branches,
-                                                  rule=branch_flow_rule)
-
-        else:
-            # 1.3. System-wide energy balance constraint
+        if self.nygrid.UsePTDF:
+            # 1.1a. System-wide energy balance constraint
             def energy_balance_rule(model, t):
                 return sum(model.PG[t, g] for g in self.generators) - model.s_over_gen[t] + model.s_load_shed[t] \
-                    == sum(self.model.PL[t, ld] for ld in self.loads)
+                    == sum(model.PL[t, ld] for ld in self.loads)
 
             self.model.c_energy_balance = pyo.Constraint(self.times,
                                                          rule=energy_balance_rule)
 
-            # 1.4. Power injection at each bus
+            # 1.2a. Power injection at each bus
             def bus_power_inj_rule(model, t, b):
-                return model.PBUS[t, b] == (sum(self.nygrid.gen_map[b, g] * model.PG[t, g] for g in self.generators)
-                                            - sum(self.nygrid.load_map[b, ld] * self.model.PL[t, ld]
+                return model.PBUS[t, b] == (sum(self.nygrid.gen_map[b, g] * model.PG[t, g] 
+                                                for g in self.generators)
+                                            - sum(self.nygrid.load_map[b, ld] * model.PL[t, ld]
                                                   for ld in self.loads))
 
             self.model.c_bus_power_inj = pyo.Constraint(self.times, self.buses,
                                                         rule=bus_power_inj_rule)
 
-            # 1.4. Linearized DC power flow using PTDF
+            # 1.3a. Linearized DC power flow using PTDF
             def dc_power_flow_ptdf_rule(model, t, br):
                 return model.PF[t, br] == sum(self.nygrid.PTDF[br, b] * model.PBUS[t, b] for b in self.buses)
 
             self.model.c_pf_ptdf = pyo.Constraint(self.times, self.branches,
                                                   rule=dc_power_flow_ptdf_rule)
 
+        else:
+            # 1.1b. DC power flow constraint
+            def dc_power_flow_rule(model, t, b):
+                return sum(self.nygrid.gen_map[b, g] * model.PG[t, g] for g in self.generators) \
+                    - sum(self.nygrid.load_map[b, ld] * model.PL[t, ld] for ld in self.loads) \
+                    == sum(self.nygrid.B[b, b_] * model.VA[t, b_] for b_ in self.buses)
+
+            self.model.c_pf = pyo.Constraint(self.times, self.buses,
+                                             rule=dc_power_flow_rule)
+
+            # 1.2b. Branch flow definition
+            def branch_flow_rule(model, t, br):
+                return model.PF[t, br] == sum(self.nygrid.Bf[br, b] * model.VA[t, b]
+                                              for b in self.buses)
+
+            self.model.c_br_flow = pyo.Constraint(self.times, self.branches,
+                                                  rule=branch_flow_rule)
+        
         # 2.2. Branch flow upper limit
         def branch_flow_max_rule(model, t, br):
             return model.PF[t, br] <= self.nygrid.br_max[br] + model.s_br_max[t, br]
@@ -415,14 +451,14 @@ class Optimizer:
 
         # 1.1. ESR real power output upper limit in charging mode
         def esr_power_crg_max_rule(model, t, esr):
-            return model.esrPCrg[t, esr] <= self.nygrid.esr_crg_max[t, esr]
+            return model.esrPCrg[t, esr] <= self.nygrid.esr_crg_max[t, esr] + model.s_esr_pcrg[t, esr]
 
         self.model.c_esr_power_crg_max = pyo.Constraint(self.times, self.esrs,
                                                         rule=esr_power_crg_max_rule)
 
         # 1.2. ESR real power output upper limit in discharging mode
         def esr_power_dis_max_rule(model, t, esr):
-            return model.esrPDis[t, esr] <= self.nygrid.esr_dis_max[t, esr]
+            return model.esrPDis[t, esr] <= self.nygrid.esr_dis_max[t, esr] + model.s_esr_pdis[t, esr]
 
         self.model.c_esr_power_dis_max = pyo.Constraint(self.times, self.esrs,
                                                         rule=esr_power_dis_max_rule)
@@ -440,8 +476,7 @@ class Optimizer:
                 if self.nygrid.esr_init is not None:
                     return model.esrSOC[t, esr] == self.nygrid.esr_init[esr] \
                         + model.esrPCrg[t, esr] * self.nygrid.esr_crg_eff[t, esr] \
-                        - model.esrPDis[t, esr] / \
-                        self.nygrid.esr_dis_eff[t, esr]
+                        - model.esrPDis[t, esr] / self.nygrid.esr_dis_eff[t, esr]
                 else:
                     return pyo.Constraint.Skip
             else:
@@ -454,14 +489,14 @@ class Optimizer:
 
         # 2.2. ESR SOC upper limit
         def esr_soc_max_rule(model, t, esr):
-            return model.esrSOC[t, esr] <= self.nygrid.esr_soc_max[t, esr]
+            return model.esrSOC[t, esr] <= self.nygrid.esr_soc_max[t, esr] + model.s_esr_soc_max[t, esr]
 
         self.model.c_esr_soc_max = pyo.Constraint(self.times, self.esrs,
                                                   rule=esr_soc_max_rule)
 
         # 2.3. ESR SOC lower limit
         def esr_soc_min_rule(model, t, esr):
-            return model.esrSOC[t, esr] >= self.nygrid.esr_soc_min[t, esr]
+            return - model.esrSOC[t, esr] <= - self.nygrid.esr_soc_min[t, esr] + model.s_esr_soc_min[t, esr]
 
         self.model.c_esr_soc_min = pyo.Constraint(self.times, self.esrs,
                                                   rule=esr_soc_min_rule)
@@ -469,7 +504,9 @@ class Optimizer:
         # 2.4. ESR SOC target
         def esr_soc_target_rule(model, t, esr):
             if t == self.nygrid.NT - 1:
-                return model.esrSOC[t, esr] == self.nygrid.esr_target[esr]
+                return model.esrSOC[t, esr] == self.nygrid.esr_target[esr] \
+                    + model.s_esr_soc_overt[t, esr] \
+                    - model.s_esr_soc_undert[t, esr]
             else:
                 return pyo.Constraint.Skip
 

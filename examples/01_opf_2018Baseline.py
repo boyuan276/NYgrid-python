@@ -1,9 +1,9 @@
 """
 Run multi-period OPF with 2018 data.
-6. With ESR and VRE case:
+1. Baseline case:
 No CPNY and CHPE HVDC lines.
-Add 6 GW ESRs.
-Add future solar and offshore wind.
+No ESRs.
+No future solar and offshore wind.
 No residential building electrification.
 """
 # %% Packages
@@ -16,17 +16,17 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from nygrid.run_nygrid import read_grid_data, read_vre_data, run_nygrid_one_day
+from nygrid.run_nygrid import read_grid_data, run_nygrid_one_day
 
 if __name__ == '__main__':
 
     # %% Simulation settings
     # NOTE: Change the following settings to run the simulation
-    sim_name = 'w_vre_esr'
+    sim_name = '2018Baseline'
     leading_hours = 12
     w_cpny = False  # True: add CPNY and CHPE HVDC lines; False: no CPNY and CHPE HVDC lines
-    w_esr = True  # True: add ESRs; False: no ESRs
-    w_vre = True  # True: add future solar and offshore wind; False: no future solar and offshore wind
+    w_esr = False  # True: add ESRs; False: no ESRs
+    w_vre = False  # True: add future solar and offshore wind; False: no future solar and offshore wind
     w_elec = False  # True: add residential building electrification; False: no residential building electrification
 
     start_date = datetime(2018, 1, 1, 0, 0, 0)
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     # %% Set up logging
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s',
-                        handlers=[logging.FileHandler(f'ex_opf_{sim_name}.log'),
+                        handlers=[logging.FileHandler(f'logs/ex_opf_{sim_name}.log'),
                                   logging.StreamHandler()])
 
     prog_start = time.time()
@@ -50,7 +50,7 @@ if __name__ == '__main__':
     else:
         data_dir = os.path.join(cwd, 'data')
 
-    grid_data_dir = os.path.join(data_dir, 'grid')
+    grid_data_dir = os.path.join(data_dir, 'grid', sim_name)
     if not os.path.exists(grid_data_dir):
         raise FileNotFoundError('Grid data directory not found.')
 
@@ -61,15 +61,6 @@ if __name__ == '__main__':
 
     results_dir = os.path.join(os.path.dirname(data_dir), 'results')
     logging.info('Results directory: {}'.format(results_dir))
-
-    solar_data_dir = os.path.join(data_dir, 'solar')
-    print('Solar data directory: {}'.format(solar_data_dir))
-
-    onshore_wind_data_dir = os.path.join(data_dir, 'onshore_wind')
-    print('Onshore wind data directory: {}'.format(onshore_wind_data_dir))
-
-    offshore_wind_data_dir = os.path.join(data_dir, 'offshore_wind')
-    print('Offshore wind data directory: {}'.format(offshore_wind_data_dir))
 
     sim_results_dir = os.path.join(results_dir, sim_name)
     if not os.path.exists(sim_results_dir):
@@ -82,7 +73,7 @@ if __name__ == '__main__':
 
     # Read DC line property file
     filename = os.path.join(grid_data_dir, 'dcline_prop.csv')
-    dcline_prop = pd.read_csv(filename, index_col=0)
+    dcline_prop = pd.read_csv(filename)
 
     if w_cpny:
         grid_data['dcline_prop'] = dcline_prop
@@ -93,7 +84,7 @@ if __name__ == '__main__':
 
     # Read ESR property file
     filename = os.path.join(grid_data_dir, 'esr_prop.csv')
-    esr_prop = pd.read_csv(filename, index_col=0)
+    esr_prop = pd.read_csv(filename)
 
     if w_esr:
         logging.info('With ESRs.')
@@ -101,19 +92,6 @@ if __name__ == '__main__':
     else:
         logging.info('No ESRs.')
         grid_data['esr_prop'] = esr_prop[:8]  # Only existing ESRs
-
-    # Read renewable generation profiles
-    if w_vre:
-        vre_prop, genmax_profile_vre = read_vre_data(solar_data_dir, onshore_wind_data_dir, offshore_wind_data_dir)
-        grid_data['vre_prop'] = vre_prop
-        grid_data['genmax_profile_vre'] = genmax_profile_vre
-        # NOTE: Make datetime index consistent
-        grid_data['genmax_profile_vre'].index = grid_data['genmax_profile'].index
-        logging.info('With future solar and offshore wind.')
-    else:
-        logging.info('No future solar and offshore wind.')
-        grid_data['vre_prop'] = None
-        grid_data['genmax_profile_vre'] = None
 
     # %% Set up OPF model
 
@@ -131,15 +109,24 @@ if __name__ == '__main__':
     for d in range(len(timestamp_list)):
         t = time.time()
 
+        # Remove leading hours for the last day
+        if d == len(timestamp_list) - 1:
+            leading_hours = 0
+
         # Run OPF for one day (24 hours) plus leading hours
         # The first day is valid, the leading hours are used to dispatch batteries properly
         start_datetime = timestamp_list[d]
-        end_datetime = start_datetime + timedelta(hours=24 + leading_hours)
+        end_datetime = start_datetime + timedelta(hours=23 + leading_hours)
 
-        nygrid_results = run_nygrid_one_day(start_datetime, end_datetime, grid_data, grid_data_dir, options, last_gen)
+        nygrid_results = run_nygrid_one_day(start_datetime, end_datetime, 
+                                            grid_data, grid_data_dir, 
+                                            options, last_gen, last_soc)
 
         # Set generator initial condition for the next iteration
         last_gen = nygrid_results['PG'].loc[start_datetime].to_numpy().squeeze()
+
+        # Set ESR initial condition for the next iteration
+        last_soc = nygrid_results['esrSOC'].loc[start_datetime].to_numpy().squeeze()
 
         # Save simulation nygrid_results to pickle
         filename = f'nygrid_sim_{sim_name}_{start_datetime.strftime("%Y%m%d%H")}.pkl'

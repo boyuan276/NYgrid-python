@@ -41,7 +41,7 @@ if __name__ == '__main__':
     # %% Set up logging
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s',
-                        handlers=[logging.FileHandler(f'ex_opf_{sim_name}.log'),
+                        handlers=[logging.FileHandler(f'logs/ex_opf_{sim_name}.log'),
                                   logging.StreamHandler()])
 
     prog_start = time.time()

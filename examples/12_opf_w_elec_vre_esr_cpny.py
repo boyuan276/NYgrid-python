@@ -24,7 +24,7 @@ if __name__ == '__main__':
 
     # %% Simulation settings
     # NOTE: Change the following settings to run the simulation
-    sim_name = '2030CLCPA'
+    sim_name = '2030CLCPA_0.0'
     leading_hours = 12
     w_cpny = True  # True: add CPNY and CHPE HVDC lines; False: no CPNY and CHPE HVDC lines
     w_esr = True  # True: add ESRs; False: no ESRs
@@ -159,17 +159,17 @@ if __name__ == '__main__':
             'res_building': {
                 'data_dir': res_building_data_dir,
                 'upgrade_id': 10,
-                'scaling_factor': 0.375
+                'scaling_factor': 0.0
             },
             'com_building': {
                 'data_dir': com_building_data_dir,
                 'upgrade_id': 18,
-                'scaling_factor': 0.375
+                'scaling_factor': 0.0
             },
             'electric_vehicle': {
                 'data_dir': electric_vehicle_data_dir,
                 'upgrade_id': 0,
-                'scaling_factor': 0.375
+                'scaling_factor': 0.0
             }
         }
 
@@ -218,11 +218,13 @@ if __name__ == '__main__':
 
         nygrid_results = run_nygrid_one_day(start_datetime, end_datetime,
                                             grid_data, grid_data_dir,
-                                            options, last_gen)
+                                            options, last_gen, last_soc)
 
         # Set generator initial condition for the next iteration
-        last_gen = nygrid_results['PG'].loc[start_datetime].to_numpy(
-        ).squeeze()
+        last_gen = nygrid_results['PG'].loc[start_datetime].to_numpy().squeeze()
+
+        # Set ESR initial condition for the next iteration
+        last_soc = nygrid_results['esrSOC'].loc[start_datetime].to_numpy().squeeze()
 
         # Save simulation nygrid_results to pickle
         filename = f'nygrid_sim_{sim_name}_{start_datetime.strftime("%Y%m%d%H")}.pkl'

@@ -50,7 +50,7 @@ if __name__ == '__main__':
     else:
         data_dir = os.path.join(cwd, 'data')
 
-    grid_data_dir = os.path.join(data_dir, 'grid', '2018Base')
+    grid_data_dir = os.path.join(data_dir, 'grid', sim_name)
     if not os.path.exists(grid_data_dir):
         raise FileNotFoundError('Grid data directory not found.')
 
@@ -118,10 +118,15 @@ if __name__ == '__main__':
         start_datetime = timestamp_list[d]
         end_datetime = start_datetime + timedelta(hours=23 + leading_hours)
 
-        nygrid_results = run_nygrid_one_day(start_datetime, end_datetime, grid_data, grid_data_dir, options, last_gen)
+        nygrid_results = run_nygrid_one_day(start_datetime, end_datetime, 
+                                            grid_data, grid_data_dir, 
+                                            options, last_gen, last_soc)
 
         # Set generator initial condition for the next iteration
         last_gen = nygrid_results['PG'].loc[start_datetime].to_numpy().squeeze()
+
+        # Set ESR initial condition for the next iteration
+        last_soc = nygrid_results['esrSOC'].loc[start_datetime].to_numpy().squeeze()
 
         # Save simulation nygrid_results to pickle
         filename = f'nygrid_sim_{sim_name}_{start_datetime.strftime("%Y%m%d%H")}.pkl'

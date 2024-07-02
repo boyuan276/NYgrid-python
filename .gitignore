@@ -1,4 +1,5 @@
 # User-specific stuff
+data/grid/*/
 data/renewable/
 data/load/
 figures/

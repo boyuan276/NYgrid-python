@@ -8,23 +8,24 @@ from pypower.idx_brch import (F_BUS, T_BUS, BR_R, BR_X, BR_B,
 from pypower.idx_cost import MODEL, NCOST, POLYNOMIAL, COST
 
 # Define index for DC lines
-DC_F_BUS = 0
-DC_T_BUS = 1
-DC_BR_STATUS = 2
-DC_PF = 3
-DC_PT = 4
-DC_QF = 5
-DC_QT = 6
-DC_VF = 7
-DC_VT = 8
-DC_PMIN = 9
-DC_PMAX = 10
-DC_QMINF = 11
-DC_QMAXF = 12
-DC_QMINT = 13
-DC_QMAXT = 14
-LOSS0 = 15
-LOSS1 = 16
+DC_NAME = 0
+DC_F_BUS = 1
+DC_T_BUS = 2
+DC_BR_STATUS = 3
+DC_PF = 4
+DC_PT = 5
+DC_QF = 6
+DC_QT = 7
+DC_VF = 8
+DC_VT = 9
+DC_PMIN = 10
+DC_PMAX = 11
+DC_QMINF = 12
+DC_QMAXF = 13
+DC_QMINT = 14
+DC_QMAXT = 15
+LOSS0 = 16
+LOSS1 = 17
 
 # Define index for ESRs
 ESR_NAME = 0

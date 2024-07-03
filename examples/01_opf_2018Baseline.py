@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from nygrid.run_nygrid import read_grid_data, run_nygrid_one_day
+import nygrid.run_nygrid as ng_run
 
 if __name__ == '__main__':
 
@@ -33,10 +33,13 @@ if __name__ == '__main__':
     end_date = datetime(2018, 12, 31, 0, 0, 0)
     timestamp_list = pd.date_range(start_date, end_date, freq='1D')
 
+    if 'examples' in os.getcwd():
+        os.chdir('../')
+
     # %% Set up logging
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s',
-                        handlers=[logging.FileHandler(f'logs/ex_opf_{sim_name}.log'),
+                        handlers=[logging.FileHandler(f'examples/logs/ex_opf_{sim_name}.log'),
                                   logging.StreamHandler()])
 
     prog_start = time.time()
@@ -44,13 +47,9 @@ if __name__ == '__main__':
 
     # %% Set up directories
     cwd = os.getcwd()
-    if 'examples' in cwd:
-        parent_dir = os.path.dirname(cwd)
-        data_dir = os.path.join(parent_dir, 'data')
-    else:
-        data_dir = os.path.join(cwd, 'data')
+    data_dir = os.path.join(cwd, 'data')
 
-    grid_data_dir = os.path.join(data_dir, 'grid', sim_name)
+    grid_data_dir = os.path.join(data_dir, 'grid', '2018Baseline')
     if not os.path.exists(grid_data_dir):
         raise FileNotFoundError('Grid data directory not found.')
 
@@ -65,11 +64,13 @@ if __name__ == '__main__':
     sim_results_dir = os.path.join(results_dir, sim_name)
     if not os.path.exists(sim_results_dir):
         os.mkdir(sim_results_dir)
+        logging.info(
+            f'Created simulation results directory: {sim_results_dir}')
 
     # %% Read grid data
 
     # Read load and generation profiles
-    grid_data = read_grid_data(grid_data_dir, start_date.year)
+    grid_data = ng_run.read_grid_profile(grid_data_dir, start_date.year)
 
     # Read DC line property file
     filename = os.path.join(grid_data_dir, 'dcline_prop.csv')
@@ -77,7 +78,8 @@ if __name__ == '__main__':
 
     if w_cpny:
         grid_data['dcline_prop'] = dcline_prop
-        logging.info('With CPNY and CHPE HVDC lines.')  # Existing and planned HVDC lines
+        # Existing and planned HVDC lines
+        logging.info('With CPNY and CHPE HVDC lines.')
     else:
         grid_data['dcline_prop'] = dcline_prop[:4]  # Only existing HVDC lines
         logging.info('Without CPNY and CHPE HVDC lines.')
@@ -96,11 +98,13 @@ if __name__ == '__main__':
     # %% Set up OPF model
 
     # Set options
-    options = {'UsePTDF': True,
-               'solver': 'gurobi',
-               'PenaltyForLoadShed': 20_000,
-               'PenaltyForBranchMwViolation': 10_000,
-               'PenaltyForInterfaceMWViolation': 10_000}
+    options = {
+        'UsePTDF': True,
+        'solver': 'gurobi',
+        'PenaltyForLoadShed': 20_000,
+        # 'PenaltyForBranchMwViolation': 10_000,
+        # 'PenaltyForInterfaceMWViolation': 10_000
+    }
 
     # No initial condition for the first day
     last_gen = None
@@ -119,15 +123,17 @@ if __name__ == '__main__':
         start_datetime = timestamp_list[d]
         end_datetime = start_datetime + timedelta(hours=23 + leading_hours)
 
-        nygrid_results = run_nygrid_one_day(start_datetime, end_datetime, 
-                                            grid_data, grid_data_dir, 
-                                            options, last_gen, last_soc)
+        nygrid_results = ng_run.run_nygrid_one_day(start_datetime, end_datetime,
+                                                   grid_data, grid_data_dir,
+                                                   options, last_gen, last_soc)
 
         # Set generator initial condition for the next iteration
-        last_gen = nygrid_results['PG'].loc[start_datetime].to_numpy().squeeze()
+        last_gen = nygrid_results['PG'].loc[start_datetime].to_numpy(
+        ).squeeze()
 
         # Set ESR initial condition for the next iteration
-        last_soc = nygrid_results['esrSOC'].loc[start_datetime].to_numpy().squeeze()
+        last_soc = nygrid_results['esrSOC'].loc[start_datetime].to_numpy(
+        ).squeeze()
 
         # Save simulation nygrid_results to pickle
         filename = f'nygrid_sim_{sim_name}_{start_datetime.strftime("%Y%m%d%H")}.pkl'
@@ -136,8 +142,10 @@ if __name__ == '__main__':
         logging.info(f'Saved simulation nygrid_results in {filename}')
 
         elapsed = time.time() - t
-        logging.info(f'Finished running for {start_datetime.strftime("%Y-%m-%d")}. Elapsed time: {elapsed:.2f} seconds')
+        logging.info(
+            f'Finished running for {start_datetime.strftime("%Y-%m-%d")}. Elapsed time: {elapsed:.2f} seconds')
         logging.info('-' * 80)
 
     tot_elapsed = time.time() - prog_start
-    logging.info(f"Finished multi-period OPF simulation {sim_name}. Total elapsed time: {tot_elapsed:.2f} seconds")
+    logging.info(
+        f"Finished multi-period OPF simulation {sim_name}. Total elapsed time: {tot_elapsed:.2f} seconds")

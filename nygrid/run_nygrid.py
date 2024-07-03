@@ -5,12 +5,114 @@ import pandas as pd
 import pickle
 from typing import Union, Dict, Tuple, Any, Optional
 
-from nygrid.nygrid import NYGrid
-from nygrid.preprocessing import agg_demand_county2bus, get_building_load_change_county
+import nygrid.nygrid as ng_grid
+import nygrid.preprocessing as ng_prep
 
 
-def read_grid_data(data_dir: Union[str, os.PathLike],
-                   year: int) -> Dict[str, pd.DataFrame]:
+def read_grid_prop(grid_data_dir: Union[str, os.PathLike]
+                   ) -> Dict[str, pd.DataFrame]:
+    """
+    Read grid data from csv files.
+
+    Parameters
+    ----------
+    grid_data_dir: str
+        Path to the grid data directory.
+
+    Returns
+    -------
+    grid_data: dict
+        Dictionary of grid data.
+        Keys: bus_prop, gen_prop, gen_fuel, gencost_prop, 
+              branch_prop, if_lim_prop, if_map_prop, 
+              storage_prop, dcline_prop
+        Values: pandas.DataFrame
+    """
+
+    # Read bus properties
+    filename = os.path.join(grid_data_dir, 'bus_prop.csv')
+    if os.path.exists(filename):
+        bus_prop = pd.read_csv(filename)
+    else:
+        raise ValueError('Bus properties file does not exist.')
+
+    # Read generator properties
+    filename = os.path.join(grid_data_dir, 'gen_prop.csv')
+    if os.path.exists(filename):
+        gen_prop = pd.read_csv(filename)
+    else:
+        raise ValueError('Generator properties file does not exist.')
+
+    # Read generator fuel type
+    filename = os.path.join(grid_data_dir, 'genfuel_prop.csv')
+    if os.path.exists(filename):
+        gen_fuel = pd.read_csv(filename)
+    else:
+        raise ValueError('Generator fuel type file does not exist.')
+
+    # Read generator cost properties
+    filename = os.path.join(grid_data_dir, 'gencost_prop.csv')
+    if os.path.exists(filename):
+        gencost_prop = pd.read_csv(filename)
+    else:
+        raise ValueError('Generator cost properties file does not exist.')
+
+    # Read AC line properties
+    filename = os.path.join(grid_data_dir, 'branch_prop.csv')
+    if os.path.exists(filename):
+        branch_prop = pd.read_csv(filename)
+        # Replace default 0 (unlimited) with 9999
+        branch_prop.loc[branch_prop['RATE_A'] == 0, 'RATE_A'] = 9999
+    else:
+        raise ValueError('AC line properties file does not exist.')
+
+    # Read interface properties
+    filename = os.path.join(grid_data_dir, 'if_lims_prop.csv')
+    if os.path.exists(filename):
+        if_lim_prop = pd.read_csv(filename)
+    else:
+        raise ValueError('Interface limit properties file does not exist.')
+
+    # Read interface mapping
+    filename = os.path.join(grid_data_dir, 'if_map_prop.csv')
+    if os.path.exists(filename):
+        if_map_prop = pd.read_csv(filename)
+    else:
+        raise ValueError('Interface mapping file does not exist.')
+
+    # Read storage properties (Optional)
+    filename = os.path.join(grid_data_dir, 'esr_prop.csv')
+    if os.path.exists(filename):
+        esr_prop = pd.read_csv(filename)
+    else:
+        Warning('No storage properties are provided.')
+        esr_prop = None
+
+    # Read DC line properties (Optional)
+    filename = os.path.join(grid_data_dir, 'dcline_prop.csv')
+    if os.path.isfile(filename):
+        dcline_prop = pd.read_csv(filename)
+    else:
+        Warning('No DC line properties are provided.')
+        dcline_prop = None
+
+    grid_prop = {
+        'bus_prop': bus_prop,
+        'gen_prop': gen_prop,
+        'gen_fuel': gen_fuel,
+        'gencost_prop': gencost_prop,
+        'branch_prop': branch_prop,
+        'if_lim_prop': if_lim_prop,
+        'if_map_prop': if_map_prop,
+        'storage_prop': esr_prop,
+        'dcline_prop': dcline_prop
+    }
+
+    return grid_prop
+
+
+def read_grid_profile(data_dir: Union[str, os.PathLike],
+                      year: int) -> Dict[str, pd.DataFrame]:
     """
     Read grid data
 
@@ -34,7 +136,8 @@ def read_grid_data(data_dir: Union[str, os.PathLike],
     load_profile = pd.read_csv(os.path.join(data_dir, f'load_profile_{year}.csv'),
                                parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
     # Remove 'Bus' prefix in column names
-    load_profile.columns = load_profile.columns.str.replace('Bus', '').astype(int)
+    load_profile.columns = load_profile.columns.str.replace(
+        'Bus', '').astype(int)
 
     # Read generation profile
     gen_profile = pd.read_csv(os.path.join(data_dir, f'gen_profile_{year}.csv'),
@@ -58,7 +161,7 @@ def read_grid_data(data_dir: Union[str, os.PathLike],
     gencost1_profile = pd.read_csv(os.path.join(data_dir, f'gencost1_profile_{year}.csv'),
                                    parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
 
-    grid_data = {
+    grid_profile = {
         'load_profile': load_profile,
         'gen_profile': gen_profile,
         'genmax_profile': genmax_profile,
@@ -68,7 +171,7 @@ def read_grid_data(data_dir: Union[str, os.PathLike],
         'gencost1_profile': gencost1_profile,
     }
 
-    return grid_data
+    return grid_profile
 
 
 def read_vre_data(solar_data_dir: Union[str, os.PathLike],
@@ -236,7 +339,7 @@ def read_res_building_elec_data(data_dir: Union[str, os.PathLike],
         fips = row['FIPS_CODE']
         county_id = f'G{str(fips)[:2]}0{str(fips)[2:]}0'
 
-        _, _, df_county_saving_amy2018 = get_building_load_change_county(
+        _, _, df_county_saving_amy2018 = ng_prep.get_building_load_change_county(
             county_id, upgrade_id, res_bldg_type_list, res_bldg_proc_dir)
 
         res_county_ts = df_county_saving_amy2018['electricity'].rename(
@@ -285,7 +388,7 @@ def read_com_building_elec_data(data_dir: Union[str, os.PathLike],
         fips = row['FIPS_CODE']
         county_id = f'G{str(fips)[:2]}0{str(fips)[2:]}0'
 
-        _, _, df_county_saving_amy2018 = get_building_load_change_county(
+        _, _, df_county_saving_amy2018 = ng_prep.get_building_load_change_county(
             county_id, upgrade_id, com_bldg_type_list, com_bldg_proc_dir)
 
         com_county_ts = df_county_saving_amy2018['electricity'].rename(
@@ -402,8 +505,8 @@ def read_electrification_data(electrification_dict: Dict[str, Any],
             load_change_county = func(data_dir=attrs['data_dir'],
                                       upgrade_id=attrs['upgrade_id'],
                                       county_attrs=county_attrs)
-            load_change_bus = agg_demand_county2bus(load_change_county,
-                                                    county_2_bus)
+            load_change_bus = ng_prep.agg_demand_county2bus(load_change_county,
+                                                            county_2_bus)
             electrification_dict[sector]['load_change'] = load_change_bus
         else:
             raise ValueError(f"Invalid sector: {sector}")
@@ -446,12 +549,12 @@ def run_nygrid_one_day(s_time: pd.Timestamp,
     """
 
     # Create NYGrid object
-    nygrid_sim = NYGrid(grid_data_dir,
-                        start_datetime=s_time.strftime('%m-%d-%Y %H'),
-                        end_datetime=e_time.strftime('%m-%d-%Y %H'),
-                        dcline_prop=grid_data.get('dcline_prop', None),
-                        esr_prop=grid_data.get('esr_prop', None),
-                        vre_prop=grid_data.get('vre_prop', None))
+    nygrid_sim = ng_grid.NYGrid(grid_data_dir,
+                                start_datetime=s_time.strftime('%m-%d-%Y %H'),
+                                end_datetime=e_time.strftime('%m-%d-%Y %H'),
+                                dcline_prop=grid_data.get('dcline_prop', None),
+                                esr_prop=grid_data.get('esr_prop', None),
+                                vre_prop=grid_data.get('vre_prop', None))
 
     # Set load and generation time series data
     nygrid_sim.set_load_sch(grid_data['load_profile'])

@@ -17,14 +17,14 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from nygrid.run_nygrid import (read_grid_data, read_vre_data,
-                               read_electrification_data, run_nygrid_one_day)
+import nygrid.run_nygrid as ng_run
+
 
 if __name__ == '__main__':
 
     # %% Simulation settings
     # NOTE: Change the following settings to run the simulation
-    sim_name = '2030CLCPA_3.0'
+    sim_name = '2030CLCPA_0.3'
     leading_hours = 12
     w_cpny = True  # True: add CPNY and CHPE HVDC lines; False: no CPNY and CHPE HVDC lines
     w_esr = True  # True: add ESRs; False: no ESRs
@@ -38,10 +38,13 @@ if __name__ == '__main__':
     end_date = datetime(2018, 12, 31, 0, 0, 0)
     timestamp_list = pd.date_range(start_date, end_date, freq='1D')
 
+    if 'examples' in os.getcwd():
+        os.chdir('../')
+
     # %% Set up logging
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s',
-                        handlers=[logging.FileHandler(f'logs/ex_opf_{sim_name}.log'),
+                        handlers=[logging.FileHandler(f'examples/logs/ex_opf_{sim_name}.log'),
                                   logging.StreamHandler()])
 
     prog_start = time.time()
@@ -49,11 +52,7 @@ if __name__ == '__main__':
 
     # %% Set up directories
     cwd = os.getcwd()
-    if 'examples' in cwd:
-        parent_dir = os.path.dirname(cwd)
-        data_dir = os.path.join(parent_dir, 'data')
-    else:
-        data_dir = os.path.join(cwd, 'data')
+    data_dir = os.path.join(cwd, 'data')
 
     grid_data_dir = os.path.join(data_dir, 'grid', '2030CLCPA')
     if not os.path.exists(grid_data_dir):
@@ -76,11 +75,13 @@ if __name__ == '__main__':
     sim_results_dir = os.path.join(results_dir, sim_name)
     if not os.path.exists(sim_results_dir):
         os.mkdir(sim_results_dir)
+        logging.info(
+            f'Created simulation results directory: {sim_results_dir}')
 
     # %% Read grid data
 
     # Read load and generation profiles
-    grid_data = read_grid_data(grid_data_dir, start_date.year)
+    grid_data = ng_run.read_grid_profile(grid_data_dir, start_date.year)
 
     # Read DC line property file
     filename = os.path.join(grid_data_dir, 'dcline_prop.csv')
@@ -120,9 +121,9 @@ if __name__ == '__main__':
         logging.info('Offshore wind data directory: {}'.format(
             offshore_wind_data_dir))
 
-        vre_prop, genmax_profile_vre = read_vre_data(solar_data_dir,
-                                                     onshore_wind_data_dir,
-                                                     offshore_wind_data_dir)
+        vre_prop, genmax_profile_vre = ng_run.read_vre_data(solar_data_dir,
+                                                            onshore_wind_data_dir,
+                                                            offshore_wind_data_dir)
         grid_data['vre_prop'] = vre_prop
         grid_data['genmax_profile_vre'] = genmax_profile_vre
         # NOTE: Make datetime index consistent
@@ -173,9 +174,9 @@ if __name__ == '__main__':
             }
         }
 
-        electrification_dict = read_electrification_data(electrification_dict,
-                                                         county_attrs,
-                                                         county_2_bus)
+        electrification_dict = ng_run.read_electrification_data(electrification_dict,
+                                                                county_attrs,
+                                                                county_2_bus)
 
         load_profile_elec = grid_data['load_profile'].copy()
 
@@ -194,11 +195,13 @@ if __name__ == '__main__':
     # %% Set up OPF model
 
     # Set options
-    options = {'UsePTDF': True,
-               'solver': 'gurobi',
-               'PenaltyForLoadShed': 20_000,
-               'PenaltyForBranchMwViolation': 10_000,
-               'PenaltyForInterfaceMWViolation': 10_000}
+    options = {
+        'UsePTDF': True,
+        'solver': 'gurobi',
+        'PenaltyForLoadShed': 20_000,
+        # 'PenaltyForBranchMwViolation': 10_000,
+        # 'PenaltyForInterfaceMWViolation': 10_000
+    }
 
     # No initial condition for the first day
     last_gen = None
@@ -217,15 +220,17 @@ if __name__ == '__main__':
         start_datetime = timestamp_list[d]
         end_datetime = start_datetime + timedelta(hours=23 + leading_hours)
 
-        nygrid_results = run_nygrid_one_day(start_datetime, end_datetime,
-                                            grid_data, grid_data_dir,
-                                            options, last_gen, last_soc)
+        nygrid_results = ng_run.run_nygrid_one_day(start_datetime, end_datetime,
+                                                   grid_data, grid_data_dir,
+                                                   options, last_gen, last_soc)
 
         # Set generator initial condition for the next iteration
-        last_gen = nygrid_results['PG'].loc[start_datetime].to_numpy().squeeze()
+        last_gen = nygrid_results['PG'].loc[start_datetime].to_numpy(
+        ).squeeze()
 
         # Set ESR initial condition for the next iteration
-        last_soc = nygrid_results['esrSOC'].loc[start_datetime].to_numpy().squeeze()
+        last_soc = nygrid_results['esrSOC'].loc[start_datetime].to_numpy(
+        ).squeeze()
 
         # Save simulation nygrid_results to pickle
         filename = f'nygrid_sim_{sim_name}_{start_datetime.strftime("%Y%m%d%H")}.pkl'

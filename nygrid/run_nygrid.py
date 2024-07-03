@@ -292,8 +292,8 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
     ], axis=1)
     genmax_profile_vre.columns = vre_prop['VRE_NAME']
     genmax_profile_vre.index = genmax_profile_vre.index.tz_convert(  # type: ignore
-
         'US/Eastern').tz_localize(None)
+
     return vre_prop, genmax_profile_vre
 
 
@@ -571,7 +571,7 @@ def run_nygrid_one_day(grid_prop: Dict[str, pd.DataFrame],
     nygrid_sim.set_gen_cost_sch(grid_profile['gencost0_profile'],
                                 grid_profile['gencost1_profile'])
 
-    if grid_profile.get('genmax_profile_vre', None) is not None:
+    if 'genmax_profile_vre' in grid_profile:
         nygrid_sim.set_vre_max_sch(grid_profile['genmax_profile_vre'])
 
     # Relax branch flow limits

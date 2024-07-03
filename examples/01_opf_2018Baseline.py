@@ -32,6 +32,7 @@ if __name__ == '__main__':
     start_date = datetime(2018, 1, 1, 0, 0, 0)
     end_date = datetime(2018, 12, 31, 0, 0, 0)
     timestamp_list = pd.date_range(start_date, end_date, freq='1D')
+    verbose = False
 
     if 'examples' in os.getcwd():
         os.chdir('../')
@@ -69,31 +70,31 @@ if __name__ == '__main__':
 
     # %% Read grid data
 
-    # Read load and generation profiles
-    grid_data = ng_run.read_grid_profile(grid_data_dir, start_date.year)
+    # Read grid property file
+    grid_prop = ng_run.read_grid_prop(grid_data_dir)
 
     # Read DC line property file
     filename = os.path.join(grid_data_dir, 'dcline_prop.csv')
     dcline_prop = pd.read_csv(filename)
-
-    if w_cpny:
-        grid_data['dcline_prop'] = dcline_prop
-        # Existing and planned HVDC lines
-        logging.info('With CPNY and CHPE HVDC lines.')
+    if not w_cpny:
+        dcline_prop = dcline_prop[:4]
+        logging.info('Only HVDC lines existing in 2018.')
     else:
-        grid_data['dcline_prop'] = dcline_prop[:4]  # Only existing HVDC lines
-        logging.info('Without CPNY and CHPE HVDC lines.')
+        logging.info('Add CPNY and CHPE HVDC lines.')
+    grid_prop['dcline_prop'] = dcline_prop
 
     # Read ESR property file
     filename = os.path.join(grid_data_dir, 'esr_prop.csv')
     esr_prop = pd.read_csv(filename)
-
-    if w_esr:
-        logging.info('With ESRs.')
-        grid_data['esr_prop'] = esr_prop  # Existing and planned ESRs
+    if not w_esr:
+        esr_prop = esr_prop[:8]
+        logging.info('Only existing ESRs in 2018.')
     else:
-        logging.info('No ESRs.')
-        grid_data['esr_prop'] = esr_prop[:8]  # Only existing ESRs
+        logging.info('Add new ESRs')
+    grid_prop['esr_prop'] = esr_prop
+
+    # Read load and generation profiles
+    grid_profile = ng_run.read_grid_profile(grid_data_dir, start_date.year)
 
     # %% Set up OPF model
 
@@ -123,9 +124,14 @@ if __name__ == '__main__':
         start_datetime = timestamp_list[d]
         end_datetime = start_datetime + timedelta(hours=23 + leading_hours)
 
-        nygrid_results = ng_run.run_nygrid_one_day(start_datetime, end_datetime,
-                                                   grid_data, grid_data_dir,
-                                                   options, last_gen, last_soc)
+        nygrid_results = ng_run.run_nygrid_one_day(grid_prop=grid_prop,
+                                                   grid_profile=grid_profile,
+                                                   start_datetime=start_datetime,
+                                                   end_datetime=end_datetime,
+                                                   options=options,
+                                                   gen_init=last_gen,
+                                                   soc_init=last_soc,
+                                                   verbose=verbose)
 
         # Set generator initial condition for the next iteration
         last_gen = nygrid_results['PG'].loc[start_datetime].to_numpy(

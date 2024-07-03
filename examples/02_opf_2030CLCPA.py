@@ -80,26 +80,6 @@ if __name__ == '__main__':
 
     # Read grid property file
     grid_prop = ng_run.read_grid_prop(grid_data_dir)
-
-    # Read DC line property file
-    filename = os.path.join(grid_data_dir, 'dcline_prop.csv')
-    dcline_prop = pd.read_csv(filename)
-    if not w_cpny:
-        dcline_prop = dcline_prop[:4]
-        logging.info('Only HVDC lines existing in 2018.')
-    else:
-        logging.info('Add CPNY and CHPE HVDC lines.')
-    grid_prop['dcline_prop'] = dcline_prop
-
-    # Read ESR property file
-    filename = os.path.join(grid_data_dir, 'esr_prop.csv')
-    esr_prop = pd.read_csv(filename)
-    if not w_esr:
-        esr_prop = esr_prop[:8]
-        logging.info('Only existing ESRs in 2018.')
-    else:
-        logging.info('Add new ESRs')
-    grid_prop['esr_prop'] = esr_prop
     
     # Read load and generation profiles
     grid_profile = ng_run.read_grid_profile(grid_data_dir, start_date.year)

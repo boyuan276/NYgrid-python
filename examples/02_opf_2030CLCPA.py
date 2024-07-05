@@ -64,12 +64,6 @@ if __name__ == '__main__':
     results_dir = os.path.join(os.path.dirname(data_dir), 'results')
     logging.info('Results directory: {}'.format(results_dir))
 
-    renewable_data_dir = os.path.join(data_dir, 'renewable')
-    print('Renewable data directory: {}'.format(renewable_data_dir))
-
-    load_data_dir = os.path.join(data_dir, 'load')
-    print('Load data directory: {}'.format(load_data_dir))
-
     sim_results_dir = os.path.join(results_dir, sim_name)
     if not os.path.exists(sim_results_dir):
         os.mkdir(sim_results_dir)
@@ -129,10 +123,10 @@ if __name__ == '__main__':
             electric_vehicle_data_dir))
 
         # Read NYS county attributes and county to bus mapping
-        county_attrs = pd.read_csv(os.path.join(
-            load_data_dir, 'county_attributes.csv'))
-        county_2_bus = pd.read_csv(os.path.join(
-            load_data_dir, 'county_2_bus.csv'))
+        county_attrs = pd.read_csv(os.path.join(data_dir,
+            'load', 'county_attributes.csv'))
+        county_2_bus = pd.read_csv(os.path.join(data_dir,
+            'load', 'county_2_bus.csv'))
 
         electrification_dict = {
             'res_building': {

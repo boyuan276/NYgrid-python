@@ -95,7 +95,9 @@ def get_pg_by_fuel_daily(pg_table: pd.DataFrame,
     return pg_by_fuel
 
 
-def thermal_pg_2_heat_input(thermal_pg, gen_info):
+def thermal_pg_2_heat_input(thermal_pg: pd.DataFrame,
+                            gen_info: pd.DataFrame
+                            ) -> pd.DataFrame:
 
     heat_input = thermal_pg.copy()
 
@@ -110,3 +112,160 @@ def thermal_pg_2_heat_input(thermal_pg, gen_info):
             thermal_pg[gen_name] + heat_rate_lm[1]
 
     return heat_input
+
+
+def get_esr_results(results_list: List[Dict],
+                    nygrid_sim: ng_grid.NYGrid
+                    ) -> Dict[str, pd.DataFrame]:
+
+    esr_pcrg_list = list()
+    esr_pdis_list = list()
+    esr_soc_list = list()
+
+    for d in range(len(results_list)):
+        # ESR charging/discharging power and state of charge
+        esr_pcrg = results_list[d]['esrPCrg'].iloc[:24, :]
+        esr_pcrg.columns = nygrid_sim.grid_prop['esr_prop']['ESR_NAME']
+        esr_pcrg_list.append(esr_pcrg)
+
+        esr_pdis = results_list[d]['esrPDis'].iloc[:24, :]
+        esr_pdis.columns = nygrid_sim.grid_prop['esr_prop']['ESR_NAME']
+        esr_pdis_list.append(esr_pdis)
+
+        esr_soc = results_list[d]['esrSOC'].iloc[:24, :]
+        esr_soc.columns = nygrid_sim.grid_prop['esr_prop']['ESR_NAME']
+        esr_soc_list.append(esr_soc)
+
+    esr_results = {
+        'esrPCrg': pd.concat(esr_pcrg_list, axis=0),
+        'esrPDis': pd.concat(esr_pdis_list, axis=0),
+        'esrSOC': pd.concat(esr_soc_list, axis=0)
+    }
+
+    return esr_results
+
+
+def get_lmp_results(results_list: List[Dict],
+                    nygrid_sim: ng_grid.NYGrid
+                    ) -> Dict[str, pd.DataFrame]:
+
+    lmp_list = list()
+
+    for d in range(len(results_list)):
+        # Locational marginal price by bus
+        lmp = results_list[d]['LMP'].iloc[:24, :]
+        lmp.columns = nygrid_sim.grid_prop['bus_prop']['BUS_I']
+        lmp_list.append(lmp)
+
+    lmp_by_bus = pd.concat(lmp_list, axis=0)
+
+    # Zonal average LMP
+    bus_zone_alloc = nygrid_sim.grid_prop['bus_prop'].set_index("BUS_I").to_dict()[
+        "BUS_ZONE"]
+    lmp_by_zone = lmp_by_bus.T.groupby(bus_zone_alloc).mean().T
+
+    lmp_results = {
+        'LMP_by_bus': lmp_by_bus,
+        'LMP_by_zone': lmp_by_zone
+    }
+
+    return lmp_results
+
+
+def get_flow_results(results_list: List[Dict],
+                     nygrid_sim: ng_grid.NYGrid
+                     ) -> Dict[str, pd.DataFrame]:
+
+    branch_names = (nygrid_sim.grid_prop['branch_prop']['F_BUS'].astype(str)
+                    + '_' + nygrid_sim.grid_prop['branch_prop']['FROM_ZONE']
+                    + '-' +
+                    nygrid_sim.grid_prop['branch_prop']['T_BUS'].astype(str)
+                    + '_' + nygrid_sim.grid_prop['branch_prop']['TO_ZONE'])
+
+    branch_flow_list = list()
+    for d in range(len(results_list)):
+        # Branch flow
+        flow = results_list[d]['PF'].iloc[:24, :]
+        flow.columns = branch_names
+        branch_flow_list.append(flow)
+
+    if_names = (nygrid_sim.grid_prop['if_lim_prop']['TO_ZONE'] + '-'
+                + nygrid_sim.grid_prop['if_lim_prop']['FROM_ZONE'])
+
+    if_flow_list = list()
+    for d in range(len(results_list)):
+        # Interface flow
+        if_flow = results_list[d]['IF'].iloc[:24, :]
+        if_flow.columns = if_names
+        if_flow_list.append(if_flow)
+
+    flow_results = {
+        'BranchFlow': pd.concat(branch_flow_list, axis=0),
+        'InterfaceFlow': pd.concat(if_flow_list, axis=0)
+    }
+
+    return flow_results
+
+
+def get_slack_penalties(results_list: List[Dict],
+                     nygrid_sim: ng_grid.NYGrid
+                     ) -> Dict[str, np.ndarray]:
+
+    slack_penalty_results = dict()
+    slack_names = ['s_over_gen', 's_load_shed',
+                   's_ramp_up', 's_ramp_down',
+                   's_br_max', 's_br_min',
+                   's_if_max', 's_if_min',
+                   's_esr_pcrg', 's_esr_pdis',
+                   's_esr_soc_min', 's_esr_soc_max',
+                   's_esr_soc_overt', 's_esr_soc_undert']
+    penalty_names = ['over_gen_penalty', 'load_shed_penalty',
+                     'ramp_up_penalty', 'ramp_down_penalty',
+                     'br_max_penalty', 'br_min_penalty',
+                     'if_max_penalty', 'if_min_penalty',
+                     'esr_pcrg_penalty', 'esr_pdis_penalty',
+                     'esr_soc_min_penalty', 'esr_soc_max_penalty',
+                     'esr_soc_overt_penalty', 'esr_soc_undert_penalty']
+    slack_penalty_names = slack_names + penalty_names
+
+    for d in range(len(results_list)):
+        # Slack variables
+        for var in slack_penalty_names:
+            slack = results_list[d][var][:24]
+
+            if var not in slack_penalty_results:
+                slack_penalty_results[var] = list()
+            slack_penalty_results[var].append(slack)
+
+    for var in slack_penalty_results.keys():
+        slack_penalty_results[var] = np.concatenate(slack_penalty_results[var],
+                                                    axis=0)
+
+    return slack_penalty_results
+
+
+def get_costs(results_list: List[Dict],
+              nygrid_sim: ng_grid.NYGrid
+              ) -> Dict[str, np.ndarray]:
+
+    gen_idx_non_cvt = np.arange(0, (nygrid_sim.NG - nygrid_sim.NDCL*2
+                                - nygrid_sim.NESR - nygrid_sim.NVRE))
+
+    gen_cost_list = list()
+    esr_cost_list = list()
+
+    for d in range(len(results_list)):
+        # Generator cost
+        gen_cost = results_list[d]['gen_cost'][:24, gen_idx_non_cvt]
+        gen_cost_list.append(gen_cost)
+
+        # ESR cost
+        esr_cost = results_list[d]['esr_cost'][:24, :]
+        esr_cost_list.append(esr_cost)
+
+    costs = {
+        'gen_cost': np.concatenate(gen_cost_list, axis=0),
+        'esr_cost': np.concatenate(esr_cost_list, axis=0)
+    }
+
+    return costs

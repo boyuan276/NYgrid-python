@@ -25,7 +25,7 @@ def read_grid_prop(grid_data_dir: Union[str, os.PathLike]
         Dictionary of grid data.
         Keys: bus_prop, gen_prop, gen_fuel, gencost_prop, 
               branch_prop, if_lim_prop, if_map_prop, 
-              storage_prop, dcline_prop
+              esr_prop, dcline_prop
         Values: pandas.DataFrame
     """
 
@@ -104,7 +104,7 @@ def read_grid_prop(grid_data_dir: Union[str, os.PathLike]
         'branch_prop': branch_prop,
         'if_lim_prop': if_lim_prop,
         'if_map_prop': if_map_prop,
-        'storage_prop': esr_prop,
+        'esr_prop': esr_prop,
         'dcline_prop': dcline_prop
     }
 
@@ -292,8 +292,8 @@ def read_vre_data(solar_data_dir: Union[str, os.PathLike],
     ], axis=1)
     genmax_profile_vre.columns = vre_prop['VRE_NAME']
     genmax_profile_vre.index = genmax_profile_vre.index.tz_convert(  # type: ignore
-
         'US/Eastern').tz_localize(None)
+
     return vre_prop, genmax_profile_vre
 
 
@@ -514,33 +514,41 @@ def read_electrification_data(electrification_dict: Dict[str, Any],
     return electrification_dict
 
 
-def run_nygrid_one_day(s_time: pd.Timestamp,
-                       e_time: pd.Timestamp,
-                       grid_data: Dict[str, pd.DataFrame],
-                       grid_data_dir: Union[str, os.PathLike],
-                       opts: Dict[str, Any],
-                       init_gen: Optional[np.ndarray],
-                       init_soc: Optional[np.ndarray]
+def run_nygrid_one_day(grid_prop: Dict[str, pd.DataFrame],
+                       grid_profile: Dict[str, pd.DataFrame],
+                       start_datetime: pd.Timestamp,
+                       end_datetime: pd.Timestamp,
+                       options: Dict[str, Any],
+                       gen_init: Optional[np.ndarray],
+                       soc_init: Optional[np.ndarray],
+                       verbose: bool = False
                        ) -> Dict[str, pd.DataFrame]:
     """
     Run NYGrid simulation for one day
 
     Parameters
     ----------
-    s_time : datetime.datetime
-        Start datetime
-    e_time : datetime.datetime
-        End datetime
-    grid_data : dict
-        Dictionary of grid data
-    grid_data_dir : str
-        Directory of grid data
-    opts : dict
+    grid_prop : dict
+        Dictionary of grid properties
+        Keys: bus_prop, gen_prop, gen_fuel, gencost_prop, branch_prop, if_lim_prop, if_map_prop
+        Values: pandas.DataFrame
+    grid_profile : dict
+        Dictionary of grid profiles
+        Keys: load_profile, gen_profile, genmax_profile, genmin_profile, genramp30_profile,
+              gencost0_profile, gencost1_profile
+        Values: pandas.DataFrame
+    start_datetime : pd.Timestamp
+        Start datetime of simulation
+    end_datetime : pd.Timestamp
+        End datetime of simulation
+    options : dict
         Dictionary of options
-    init_gen : numpy.ndarray
-        Generator initial condition
-    init_soc : numpy.ndarray
-        ESR initial state of charge
+    init_gen : np.ndarray
+        Initial generator status
+    init_soc : np.ndarray
+        Initial ESR SOC
+    verbose : bool, optional
+        Print verbose output, by default
 
     Returns
     -------
@@ -549,36 +557,34 @@ def run_nygrid_one_day(s_time: pd.Timestamp,
     """
 
     # Create NYGrid object
-    nygrid_sim = ng_grid.NYGrid(grid_data_dir,
-                                start_datetime=s_time.strftime('%m-%d-%Y %H'),
-                                end_datetime=e_time.strftime('%m-%d-%Y %H'),
-                                dcline_prop=grid_data.get('dcline_prop', None),
-                                esr_prop=grid_data.get('esr_prop', None),
-                                vre_prop=grid_data.get('vre_prop', None))
+    nygrid_sim = ng_grid.NYGrid(grid_prop=grid_prop,
+                                start_datetime=start_datetime,
+                                end_datetime=end_datetime,
+                                verbose=verbose)
 
     # Set load and generation time series data
-    nygrid_sim.set_load_sch(grid_data['load_profile'])
-    nygrid_sim.set_gen_mw_sch(grid_data['gen_profile'])
-    nygrid_sim.set_gen_max_sch(grid_data['genmax_profile'])
-    nygrid_sim.set_gen_min_sch(grid_data['genmin_profile'])
-    nygrid_sim.set_gen_ramp_sch(grid_data['genramp30_profile'])
-    nygrid_sim.set_gen_cost_sch(grid_data['gencost0_profile'],
-                                grid_data['gencost1_profile'])
+    nygrid_sim.set_load_sch(grid_profile['load_profile'])
+    nygrid_sim.set_gen_mw_sch(grid_profile['gen_profile'])
+    nygrid_sim.set_gen_max_sch(grid_profile['genmax_profile'])
+    nygrid_sim.set_gen_min_sch(grid_profile['genmin_profile'])
+    nygrid_sim.set_gen_ramp_sch(grid_profile['genramp30_profile'])
+    nygrid_sim.set_gen_cost_sch(grid_profile['gencost0_profile'],
+                                grid_profile['gencost1_profile'])
 
-    if grid_data.get('genmax_profile_vre', None) is not None:
-        nygrid_sim.set_vre_max_sch(grid_data['genmax_profile_vre'])
+    if 'genmax_profile_vre' in grid_profile:
+        nygrid_sim.set_vre_max_sch(grid_profile['genmax_profile_vre'])
 
     # Relax branch flow limits
     nygrid_sim.relax_external_branch_lim()
 
     # Set generator initial condition
-    nygrid_sim.set_gen_init_data(gen_init=init_gen)
+    nygrid_sim.set_gen_init_data(gen_init=gen_init)
 
     # Set ESR initial condition
-    nygrid_sim.set_esr_init_data(esr_init=init_soc)
+    nygrid_sim.set_esr_init_data(esr_init=soc_init)
 
     # Set options
-    nygrid_sim.set_options(opts)
+    nygrid_sim.set_options(options)
 
     # Solve DC OPF
     nygrid_sim.solve_dc_opf()

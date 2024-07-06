@@ -2,11 +2,8 @@
 Class for running the NYGrid model.
 
 Known Issues/Wishlist:
-1. Better dc line model
-2. Better documentation
-3. Check dim of start/end datetime and load profile
-
 """
+
 import logging
 import os
 
@@ -52,7 +49,8 @@ def check_status(results: SolverResults) -> bool:
 
 
 def convert_dcline_2_gen(ppc: Dict[str, np.ndarray],
-                         dcline_prop: Optional[Union[np.ndarray, pd.DataFrame]] = None
+                         dcline_prop: Optional[Union[np.ndarray,
+                                                     pd.DataFrame]] = None
                          ) -> Tuple[Dict[str, np.ndarray], int]:
     """
     Convert DC lines to generators and add their parameters in the PyPower matrices.
@@ -82,18 +80,21 @@ def convert_dcline_2_gen(ppc: Dict[str, np.ndarray],
         dcline = dcline_prop
     else:
         dcline = ppc_dc['dcline']
-        Warning('No DC line properties are provided. Use default values from the PyPower case.')
+        Warning(
+            'No DC line properties are provided. Use default values from the PyPower case.')
 
     if isinstance(dcline, pd.DataFrame):
         dcline = dcline.to_numpy()
     elif isinstance(dcline, np.ndarray):
         pass
     else:
-        raise ValueError('DC line properties must be a numpy.ndarray or pandas.DataFrame.')
+        raise ValueError(
+            'DC line properties must be a numpy.ndarray or pandas.DataFrame.')
 
     # Set gen parameters of the DC line converted generators
     num_dcline = dcline.shape[0]
-    dcline_gen = np.zeros((num_dcline * 2, 21))  # One at from bus, one at to bus
+    # One at from bus, one at to bus
+    dcline_gen = np.zeros((num_dcline * 2, 21))
     dcline_gen[:, GEN_BUS] = np.concatenate([dcline[:, DC_F_BUS],
                                              dcline[:, DC_T_BUS]])
     dcline_gen[:, PG] = np.concatenate([-dcline[:, DC_PF],
@@ -113,9 +114,11 @@ def convert_dcline_2_gen(ppc: Dict[str, np.ndarray],
                                           dcline[:, DC_PMAX]])
     dcline_gen[:, PMIN] = np.concatenate([dcline[:, DC_PMIN],
                                           dcline[:, DC_PMIN]])
-    dcline_gen[:, RAMP_AGC] = np.ones(num_dcline * 2) * 1e6  # Unlimited ramp rate
-    dcline_gen[:, RAMP_10] = np.ones(num_dcline * 2) * 1e6  # Unlimited ramp rate
-    dcline_gen[:, RAMP_30] = np.ones(num_dcline * 2) * 1e6  # Unlimited ramp rate
+    # Unlimited ramp rate
+    dcline_gen[:, RAMP_AGC] = np.ones(num_dcline * 2) * 1e6
+    dcline_gen[:, RAMP_10] = np.ones(num_dcline * 2) * 1e6
+    dcline_gen[:, RAMP_30] = np.ones(num_dcline * 2) * 1e6
+
     # Add the DC line converted generators to the gen matrix
     ppc_dc['gen'] = np.concatenate([ppc['gen'], dcline_gen])
 
@@ -123,6 +126,7 @@ def convert_dcline_2_gen(ppc: Dict[str, np.ndarray],
     dcline_gencost = np.zeros((num_dcline * 2, 6))
     dcline_gencost[:, MODEL] = np.ones(num_dcline * 2) * POLYNOMIAL
     dcline_gencost[:, NCOST] = np.ones(num_dcline * 2) * 2
+
     # Add the DC line converted generators to the gencost matrix
     ppc_dc['gencost'] = np.concatenate([ppc['gencost'], dcline_gencost])
 
@@ -135,7 +139,8 @@ def convert_dcline_2_gen(ppc: Dict[str, np.ndarray],
 
 
 def convert_esr_2_gen(ppc: Dict[str, np.ndarray],
-                      esr_prop: Optional[Union[np.ndarray, pd.DataFrame]] = None
+                      esr_prop: Optional[Union[np.ndarray,
+                                               pd.DataFrame]] = None
                       ) -> Tuple[Dict[str, np.ndarray], int]:
     """
     Convert ESR to generators and add their parameters in the PyPower matrices.
@@ -169,7 +174,8 @@ def convert_esr_2_gen(ppc: Dict[str, np.ndarray],
     elif isinstance(esr_prop, np.ndarray):
         pass
     else:
-        raise ValueError('ESR properties must be a numpy.ndarray or pandas.DataFrame.')
+        raise ValueError(
+            'ESR properties must be a numpy.ndarray or pandas.DataFrame.')
 
     # Set gen parameters of the ESR converted generators
     num_esr = esr_prop.shape[0]
@@ -205,7 +211,8 @@ def convert_esr_2_gen(ppc: Dict[str, np.ndarray],
 
 
 def convert_vre_2_gen(ppc: Dict[str, np.ndarray],
-                      vre_prop: Optional[Union[np.ndarray, pd.DataFrame]] = None
+                      vre_prop: Optional[Union[np.ndarray,
+                                               pd.DataFrame]] = None
                       ) -> Tuple[Dict[str, np.ndarray], int]:
     """
     Convert renewable generators to generators and add their parameters in the PyPower matrices.
@@ -237,7 +244,8 @@ def convert_vre_2_gen(ppc: Dict[str, np.ndarray],
     elif isinstance(vre_prop, np.ndarray):
         pass
     else:
-        raise ValueError('VRE properties must be a numpy.ndarray or pandas.DataFrame.')
+        raise ValueError(
+            'VRE properties must be a numpy.ndarray or pandas.DataFrame.')
 
     # Set gen parameters of the VRE converted generators
     num_vre = vre_prop.shape[0]
@@ -279,13 +287,11 @@ class NYGrid:
     """
 
     def __init__(self,
-                 grid_data_dir: Union[str, os.PathLike],
+                 grid_prop: Dict[str, pd.DataFrame],
                  start_datetime: Union[str, pd.Timestamp],
                  end_datetime: Union[str, pd.Timestamp],
-                 dcline_prop: Optional[pd.DataFrame] = None,
-                 esr_prop: Optional[pd.DataFrame] = None,
-                 vre_prop: Optional[pd.DataFrame] = None,
-                 verbose: bool = False) -> None:
+                 verbose: bool = False
+                 ) -> None:
         """
         Initialize the NYGrid model.
 
@@ -324,7 +330,8 @@ class NYGrid:
             self.end_datetime = ng_utils.format_date(end_datetime)
 
         self.delta_t = self.end_datetime - self.start_datetime
-        self.timestamp_list = pd.date_range(self.start_datetime, self.end_datetime, freq='1H')
+        self.timestamp_list = pd.date_range(
+            self.start_datetime, self.end_datetime, freq='1H')
         self.NT = len(self.timestamp_list)
 
         if self.verbose:
@@ -334,35 +341,46 @@ class NYGrid:
             logging.info(f'NYGrid run duration: {self.delta_t}')
 
         # %% Read grid data
-        self.grid_data = ng_run.read_grid_prop(grid_data_dir)
-        
-        if vre_prop is not None and vre_prop.size > 0:
-            self.grid_data['vre_prop'] = vre_prop
+        self.grid_prop = grid_prop
 
         # %% Create PyPower case
         self.ppc = dict()
         self.ppc['baseMVA'] = 100
         self.ppc['version'] = '2'
-        self.ppc['bus'] = self.grid_data['bus_prop'].drop(columns=['BUS_ZONE']).to_numpy()
-        self.ppc['gen'] = self.grid_data['gen_prop'].drop(columns=['GEN_NAME', 'GEN_ZONE', 'GEN_FUEL']).to_numpy()
-        self.ppc['genfuel'] = self.grid_data['gen_fuel'].drop(columns=['GEN_NAME']).to_numpy()
-        self.ppc['gencost'] = self.grid_data['gencost_prop'].drop(columns=['GEN_NAME']).to_numpy()
-        self.ppc['branch'] = self.grid_data['branch_prop'].drop(columns=['FROM_ZONE', 'TO_ZONE']).to_numpy()
-        self.ppc['dcline'] = self.grid_data['dcline_prop'].drop(columns=['DC_NAME', 'FROM_ZONE', 'TO_ZONE']).to_numpy()
-        self.ppc['if'] = {'lims': self.grid_data['if_lim_prop'].drop(columns=['FROM_ZONE', 'TO_ZONE']).to_numpy(),
-                          'map': self.grid_data['if_map_prop'].drop(columns=['BR_IDX', 'BR_DIR']).to_numpy()}
+        self.ppc['bus'] = (self.grid_prop['bus_prop']
+                           .drop(columns=['BUS_ZONE']).to_numpy())
+        self.ppc['gen'] = (self.grid_prop['gen_prop']
+                           .drop(columns=['GEN_NAME', 'GEN_ZONE', 'GEN_FUEL']).to_numpy())
+        self.ppc['genfuel'] = (self.grid_prop['gen_fuel']
+                               .drop(columns=['GEN_NAME']).to_numpy())
+        self.ppc['gencost'] = (self.grid_prop['gencost_prop']
+                               .drop(columns=['GEN_NAME']).to_numpy())
+        self.ppc['branch'] = (self.grid_prop['branch_prop']
+                              .drop(columns=['FROM_ZONE', 'TO_ZONE']).to_numpy())
+        self.ppc['dcline'] = (self.grid_prop['dcline_prop']
+                              .drop(columns=['DC_NAME', 'FROM_ZONE', 'TO_ZONE']).to_numpy())
+        self.ppc['if'] = {'lims': (self.grid_prop['if_lim_prop']
+                                   .drop(columns=['FROM_ZONE', 'TO_ZONE']).to_numpy()),
+                          'map': (self.grid_prop['if_map_prop']
+                                  .drop(columns=['BR_IDX', 'BR_DIR']).to_numpy())}
 
         # Convert DC line to generators and add to gen matrix
-        self.ppc_dc, self.NDCL = convert_dcline_2_gen(self.ppc, dcline_prop)
+        self.ppc, self.NDCL = convert_dcline_2_gen(self.ppc,
+                                                   self.grid_prop['dcline_prop'])
 
         # Convert ESR to generators and add to gen matrix
-        self.ppc_dc_esr, self.NESR = convert_esr_2_gen(self.ppc_dc, esr_prop)
+        self.ppc, self.NESR = convert_esr_2_gen(self.ppc,
+                                                self.grid_prop['esr_prop'])
 
         # Convert renewable generators to generators and add to gen matrix
-        self.ppc_dc_esr_vre, self.NVRE = convert_vre_2_gen(self.ppc_dc_esr, vre_prop)
+        if 'vre_prop' in self.grid_prop:
+            self.ppc, self.NVRE = convert_vre_2_gen(self.ppc,
+                                                    self.grid_prop['vre_prop'])
+        else:
+            self.NVRE = 0
 
         # Convert to internal indexing
-        self.ppc_int = pp.ext2int(self.ppc_dc_esr_vre)
+        self.ppc_int = pp.ext2int(self.ppc)
 
         self.baseMVA = self.ppc_int['baseMVA']
         self.bus = self.ppc_int['bus']
@@ -371,7 +389,8 @@ class NYGrid:
         self.gencost = self.ppc_int['gencost']
 
         # Generator info
-        self.gen_bus = self.gen[:, GEN_BUS].astype(int)  # what buses are they at?
+        # what buses are they at?
+        self.gen_bus = self.gen[:, GEN_BUS].astype(int)
 
         # Build B matrices and phase shift injections
         B, Bf, _, _ = pp.makeBdc(self.baseMVA, self.bus, self.branch)
@@ -393,7 +412,8 @@ class NYGrid:
 
         # Get index of existing generators (not DC line or ESR converted)
         self.gen_i2e = self.ppc_int['order']['gen']['i2e']
-        self.gen_idx_non_cvt = self.gen_i2e[:self.NG - self.NDCL * 2 - self.NESR - self.NVRE]
+        self.gen_idx_non_cvt = self.gen_i2e[:self.NG - self.NDCL * 2
+                                            - self.NESR - self.NVRE]
 
         # Get index of DC line converted generators in internal indexing
         self.dcline_idx_f = self.gen_i2e[self.NG - self.NDCL * 2 - self.NESR - self.NVRE:
@@ -402,7 +422,8 @@ class NYGrid:
                                          self.NG - self.NESR - self.NVRE]
 
         # Get index of ESR converted generators in internal indexing
-        self.esr_idx = self.gen_i2e[self.NG - self.NESR - self.NVRE: self.NG - self.NVRE]
+        self.esr_idx = self.gen_i2e[self.NG - self.NESR - self.NVRE:
+                                    self.NG - self.NVRE]
 
         # Get index of VRE converted generators in internal indexing
         self.vre_idx = self.gen_i2e[self.NG - self.NVRE: self.NG]
@@ -433,7 +454,8 @@ class NYGrid:
         for n in range(self.NIF):
             if_id, if_lims_min, if_lims_max = self.if_lims[n, :]
             br_dir_idx = self.if_map[(self.if_map[:, 0] == int(if_id)), 1]
-            br_dir, br_idx = np.sign(br_dir_idx), np.abs(br_dir_idx).astype(int)
+            br_dir = np.sign(br_dir_idx)
+            br_idx = np.abs(br_dir_idx).astype(int)
             self.if_br_dir[n] = br_dir
             self.if_br_idx[n] = br_idx
             self.if_lims_max[n] = if_lims_max
@@ -443,62 +465,66 @@ class NYGrid:
         self.gen_hist = np.zeros((self.NT, self.NG))
 
         # Generator upper operating limit in p.u.
-        self.gen_max = np.ones((self.NT, self.NG)) * self.gen[:, PMAX] / self.baseMVA
+        self.gen_max = np.ones((self.NT, self.NG)) * \
+            self.gen[:, PMAX] / self.baseMVA
 
         # Generator lower operating limit in p.u.
-        self.gen_min = np.ones((self.NT, self.NG)) * self.gen[:, PMIN] / self.baseMVA
+        self.gen_min = np.ones((self.NT, self.NG)) * \
+            self.gen[:, PMIN] / self.baseMVA
 
         # Generator ramp rate limit in p.u./hour
-        self.ramp_up = np.ones((self.NT, self.NG)) * self.gen[:, RAMP_30] * 2 / self.baseMVA
-        # Downward ramp rate is the minimum of the upward ramp rate and the maximum generation limit
-        # self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
+        self.ramp_up = np.ones((self.NT, self.NG)) * \
+            self.gen[:, RAMP_30] * 2 / self.baseMVA
         self.ramp_down = self.ramp_up
 
         # Linear cost intercept coefficients in p.u.
-        self.gencost_0 = np.ones((self.NT, self.NG)) * self.gencost[:, COST + 1]
+        self.gencost_0 = np.ones((self.NT, self.NG)) * \
+            self.gencost[:, COST + 1]
 
         # Linear cost slope coefficients in p.u.
-        self.gencost_1 = np.ones((self.NT, self.NG)) * self.gencost[:, COST] * self.baseMVA
+        self.gencost_1 = np.ones((self.NT, self.NG)) * \
+            self.gencost[:, COST] * self.baseMVA
 
         # Convert load to p.u.
-        self.load_pu = np.ones((self.NT, self.NL)) * self.bus[:, PD] / self.baseMVA
+        self.load_pu = np.ones((self.NT, self.NL)) * \
+            self.bus[:, PD] / self.baseMVA
 
         # Generator initial condition
         self.gen_init = None
 
         # Add ESR properties
-        if esr_prop is not None and esr_prop.size > 0:
+        if self.grid_prop['esr_prop'] is not None and self.grid_prop['esr_prop'].size > 0:
 
             # ESR charging power upper limit in p.u.
             self.esr_crg_max = np.ones((self.NT, self.NESR)) * \
-                esr_prop.iloc[:, ESR_CRG_MAX].to_numpy() / self.baseMVA
+                self.grid_prop['esr_prop'].iloc[:, ESR_CRG_MAX].to_numpy() / self.baseMVA
             # ESR discharging power upper limit in p.u.
             self.esr_dis_max = np.ones((self.NT, self.NESR)) * \
-                esr_prop.iloc[:, ESR_DIS_MAX].to_numpy() / self.baseMVA
+                self.grid_prop['esr_prop'].iloc[:, ESR_DIS_MAX].to_numpy() / self.baseMVA
             # ESR charging efficiency
             self.esr_crg_eff = np.ones((self.NT, self.NESR)) * \
-                esr_prop.iloc[:, ESR_CRG_EFF].to_numpy()
+                self.grid_prop['esr_prop'].iloc[:, ESR_CRG_EFF].to_numpy()
             # ESR discharging efficiency
             self.esr_dis_eff = np.ones((self.NT, self.NESR)) * \
-                esr_prop.iloc[:, ESR_DIS_EFF].to_numpy()
+                self.grid_prop['esr_prop'].iloc[:, ESR_DIS_EFF].to_numpy()
             # ESR SOC upper limit in p.u.
             self.esr_soc_max = np.ones((self.NT, self.NESR)) * \
-                esr_prop.iloc[:, ESR_SOC_MAX].to_numpy() / self.baseMVA
+                self.grid_prop['esr_prop'].iloc[:, ESR_SOC_MAX].to_numpy() / self.baseMVA
             # ESR SOC lower limit in p.u.
             self.esr_soc_min = np.ones((self.NT, self.NESR)) * \
-                esr_prop.iloc[:, ESR_SOC_MIN].to_numpy() / self.baseMVA
+                self.grid_prop['esr_prop'].iloc[:, ESR_SOC_MIN].to_numpy() / self.baseMVA
             # ESR SOC initial condition in p.u.
             self.esr_init = np.ones(self.NESR) * \
-                esr_prop.iloc[:, ESR_SOC_INI].to_numpy() / self.baseMVA
+                self.grid_prop['esr_prop'].iloc[:, ESR_SOC_INI].to_numpy() / self.baseMVA
             # ESR SOC target condition in p.u.
             self.esr_target = np.ones(self.NESR) * \
-                esr_prop.iloc[:, ESR_SOC_TGT].to_numpy() / self.baseMVA
+                self.grid_prop['esr_prop'].iloc[:, ESR_SOC_TGT].to_numpy() / self.baseMVA
             # ESR charging cost
             self.esrcost_crg = np.ones((self.NT, self.NESR)) * \
-                esr_prop.iloc[:, ESR_CRG_COST].to_numpy() * self.baseMVA
+                self.grid_prop['esr_prop'].iloc[:, ESR_CRG_COST].to_numpy() * self.baseMVA
             # ESR discharging cost
             self.esrcost_dis = np.ones((self.NT, self.NESR)) * \
-                esr_prop.iloc[:, ESR_DIS_COST].to_numpy() * self.baseMVA
+                self.grid_prop['esr_prop'].iloc[:, ESR_DIS_COST].to_numpy() * self.baseMVA
 
         # %% Create Pyomo model
         self.model = pyo.ConcreteModel(name='multi-period DC OPF')
@@ -526,7 +552,8 @@ class NYGrid:
         self.MaxPhaseAngleDifference = 1.5  # Radians, Not used
         # ES module
         self.PenaltyForESRPowerViolation = 8_000  # $/MWh
-        self.PenaltyForESRSOCViolation = 8_000  # $/MWh
+        self.PenaltyForESRSOCLimitViolation = 8_000  # $/MWh
+        self.PenaltyForESRSOCTargetViolation = 500  # $/MWh
 
         # Model options
         # Use Power Transfer Distribution Factors (PTDF) for linear shift factor
@@ -552,7 +579,6 @@ class NYGrid:
             if self.verbose:
                 logging.info(f'Set {key} to {value} ...')
 
-    
     def set_load_sch(self, load_sch: pd.DataFrame) -> None:
         """
         Set load schedule data from load profile.
@@ -570,11 +596,12 @@ class NYGrid:
         if load_sch is not None and load_sch.size > 0:
             # Check the shape of the load profile
             if load_sch.shape[1] != self.NB:
-                raise ValueError('The number of buses in the load profile does not match the network.')
+                raise ValueError(
+                    'The number of buses in the load profile does not match the network.')
 
             # Slice the load profile to the simulation period
             load_sch = load_sch[self.start_datetime:self.end_datetime]
-            bus_order = self.grid_data['bus_prop']['BUS_I'].values
+            bus_order = self.grid_prop['bus_prop']['BUS_I'].values
             load_sch_sorted = load_sch[bus_order].to_numpy()
 
             # Convert load to p.u.
@@ -582,7 +609,6 @@ class NYGrid:
         else:
             raise ValueError('No load profile is provided.')
 
-    
     def set_gen_mw_sch(self, gen_mw_sch: pd.DataFrame) -> None:
         """
         Set generator schedule data from generation profile.
@@ -600,7 +626,7 @@ class NYGrid:
         if gen_mw_sch is not None and gen_mw_sch.size > 0:
             # Slice the generation profile to the simulation period
             gen_mw_sch = gen_mw_sch[self.start_datetime: self.end_datetime]
-            gen_order = self.grid_data['gen_prop']['GEN_NAME'].values
+            gen_order = self.grid_prop['gen_prop']['GEN_NAME'].values
             gen_mw_sch_sorted = gen_mw_sch[gen_order].to_numpy()
 
             # Generator schedule in p.u.
@@ -613,12 +639,9 @@ class NYGrid:
                 (self.NT, self.NDCL)) * self.gen[self.dcline_idx_f, PG] / self.baseMVA
             self.gen_hist[:, self.dcline_idx_t] = np.ones(
                 (self.NT, self.NDCL)) * self.gen[self.dcline_idx_t, PG] / self.baseMVA
-            
-            # FIXME: Ignore ESR and VRE for now
         else:
             raise ValueError('No generation profile is provided.')
 
-    
     def set_gen_max_sch(self, gen_max_sch: pd.DataFrame) -> None:
         """
         Set generator upper operating limit data from generation capacity profile.
@@ -636,7 +659,7 @@ class NYGrid:
         if gen_max_sch is not None and gen_max_sch.size > 0:
             # Slice the generator profile to the simulation period
             gen_max_sch = gen_max_sch[self.start_datetime: self.end_datetime]
-            gen_order = self.grid_data['gen_prop']['GEN_NAME'].values
+            gen_order = self.grid_prop['gen_prop']['GEN_NAME'].values
             gen_max_sch_sorted = gen_max_sch[gen_order].to_numpy()
 
             # Generator upper operating limit in p.u.
@@ -646,7 +669,6 @@ class NYGrid:
         else:
             raise ValueError('No generation capacity profile is provided.')
 
-    
     def set_vre_max_sch(self, vre_max_sch: pd.DataFrame) -> None:
         """
         Set VRE upper operating limit data from generation capacity profile.
@@ -664,7 +686,7 @@ class NYGrid:
         if vre_max_sch is not None and vre_max_sch.size > 0:
             # Slice the generator profile to the simulation period
             vre_max_sch = vre_max_sch[self.start_datetime: self.end_datetime]
-            vre_order = self.grid_data['vre_prop']['VRE_NAME'].values
+            vre_order = self.grid_prop['vre_prop']['VRE_NAME'].values
             vre_max_sch_sorted = vre_max_sch[vre_order].to_numpy()
 
             # Renewable upper operating limit in p.u.
@@ -673,7 +695,6 @@ class NYGrid:
         else:
             raise ValueError('No VRE generation capacity profile is provided.')
 
-    
     def set_gen_min_sch(self, gen_min_sch: pd.DataFrame) -> None:
         """
         Set generator lower operating limit data from generation capacity profile.
@@ -691,7 +712,7 @@ class NYGrid:
         if gen_min_sch is not None and gen_min_sch.size > 0:
             # Slice the generator profile to the simulation period
             gen_min_sch = gen_min_sch[self.start_datetime: self.end_datetime]
-            gen_order = self.grid_data['gen_prop']['GEN_NAME'].values
+            gen_order = self.grid_prop['gen_prop']['GEN_NAME'].values
             gen_min_sch_sorted = gen_min_sch[gen_order].to_numpy()
 
             # Generator lower operating limit in p.u.
@@ -701,7 +722,6 @@ class NYGrid:
         else:
             raise ValueError('No generation capacity profile is provided.')
 
-    
     def set_gen_ramp_sch(self, gen_ramp_sch: pd.DataFrame,
                          interval: str = '30min') -> None:
         """
@@ -720,12 +740,12 @@ class NYGrid:
         """
 
         if gen_ramp_sch is not None and gen_ramp_sch.size > 0:
-        
+
             # Convert 30min ramp rate to hourly ramp rate
             if interval == '30min':
                 gen_ramp_sch = gen_ramp_sch * 2
                 gen_ramp_sch = gen_ramp_sch[self.start_datetime: self.end_datetime]
-                gen_order = self.grid_data['gen_prop']['GEN_NAME'].values
+                gen_order = self.grid_prop['gen_prop']['GEN_NAME'].values
                 gen_ramp_sch_sorted = gen_ramp_sch[gen_order].to_numpy()
 
                 # Convert default value 0 (Unlimited) to 1e6
@@ -743,7 +763,6 @@ class NYGrid:
         # self.ramp_down = np.min([self.gen_max, self.ramp_up], axis=0)
         self.ramp_down = self.ramp_up
 
-    
     def set_gen_cost_sch(self, gen_cost0_sch: pd.DataFrame,
                          gen_cost1_sch: pd.DataFrame) -> None:
         """
@@ -761,14 +780,13 @@ class NYGrid:
         None
         """
 
-        
         if (gen_cost0_sch is not None and gen_cost0_sch.size > 0
-            and gen_cost1_sch is not None and gen_cost1_sch.size > 0):
-        
+                and gen_cost1_sch is not None and gen_cost1_sch.size > 0):
+
             # Slice the generator profile to the simulation period
             gen_cost0_sch = gen_cost0_sch[self.start_datetime: self.end_datetime]
             gen_cost1_sch = gen_cost1_sch[self.start_datetime: self.end_datetime]
-            gen_order = self.grid_data['gen_prop']['GEN_NAME'].values
+            gen_order = self.grid_prop['gen_prop']['GEN_NAME'].values
             gen_cost0_sch_sorted = gen_cost0_sch[gen_order].to_numpy()
             gen_cost1_sch_sorted = gen_cost1_sch[gen_order].to_numpy()
 
@@ -778,12 +796,12 @@ class NYGrid:
 
             # Linear cost slope coefficients in p.u.
             # Thermal generators: Use user-defined time series schedule
-            self.gencost_1[:, self.gen_idx_non_cvt] = gen_cost1_sch_sorted * self.baseMVA
+            self.gencost_1[:, self.gen_idx_non_cvt] = \
+                gen_cost1_sch_sorted * self.baseMVA
 
         else:
             raise ValueError('No generation cost profile is provided.')
 
-    
     def relax_external_branch_lim(self):
         """
         Relax external branch flow limit to 999.99.
@@ -796,7 +814,6 @@ class NYGrid:
         self.br_max[self.br_max != 999.99] = 999.99
         self.br_min[self.br_min != -999.99] = -999.99
 
-    
     def set_gen_init_data(self, gen_init: Optional[np.ndarray]) -> None:
         """
         Get generator initial condition.
@@ -809,12 +826,12 @@ class NYGrid:
 
         if gen_init is not None and gen_init.size > 0:
             # Convert to internal generator indexing
-            gen_init = pd.DataFrame(gen_init, index=self.gen_i2e).sort_index().to_numpy().squeeze()
+            gen_init = pd.DataFrame(
+                gen_init, index=self.gen_i2e).sort_index().to_numpy().squeeze()
             self.gen_init = gen_init / self.baseMVA
         else:
             Warning('No generator initial condition is provided.')
 
-    
     def set_esr_init_data(self, esr_init: Optional[np.ndarray]) -> None:
         """
         Get ESR initial condition.
@@ -830,7 +847,6 @@ class NYGrid:
         else:
             Warning('No ESR initial condition is provided.')
 
-    
     def check_input_dim(self) -> None:
         """
         Check the dimensions of the input data.
@@ -841,12 +857,13 @@ class NYGrid:
         """
         if (self.gen_min.shape != self.gen_max.shape) \
                 or (self.ramp_down.shape != self.ramp_up.shape):
-            raise ValueError('Found mismatch in generator constraint dimensions!')
+            raise ValueError(
+                'Found mismatch in generator constraint dimensions!')
 
         if self.br_min.shape != self.br_max.shape:
-            raise ValueError('Found mismatch in branch flow limit array dimensions!')
+            raise ValueError(
+                'Found mismatch in branch flow limit array dimensions!')
 
-    
     def create_dc_opf(self) -> None:
         """
         Create a multi-period DC OPF problem.
@@ -883,8 +900,10 @@ class NYGrid:
 
         self.model = optimizer.model
 
-    
-    def solve_dc_opf(self, solver_options: Optional[Dict[str, Union[int, float]]] = None) -> None:
+    def solve_dc_opf(self,
+                     solver_options: Optional[Dict[str,
+                                                   Union[int, float]]] = None
+                     ) -> None:
         """
         Solve a multi-period DC OPF problem.
 
@@ -918,7 +937,6 @@ class NYGrid:
         if check_status(results):
             logging.info(f"Objective function value: {self.model.obj():.3e}")
 
-    
     def get_results_dc_opf(self) -> Dict[str, pd.DataFrame]:
         """
         Get results for a multi-period OPF problem.
@@ -939,19 +957,22 @@ class NYGrid:
         # %% Decision variables
 
         # Power generation
-        results_pg = np.array(self.model.PG[:, :]()).reshape(self.NT, self.NG) * self.baseMVA
+        results_pg = (np.array(self.model.PG[:, :]())
+                      .reshape(self.NT, self.NG) * self.baseMVA)
         gen_order = self.ppc_int['order']['gen']['e2i']
         results_pg = pd.DataFrame(results_pg, index=self.timestamp_list,
                                   columns=gen_order).sort_index(axis=1)
         variables['PG'] = results_pg
 
         # Branch power flow
-        branch_pf = np.array(self.model.PF[:, :]()).reshape(self.NT, self.NBR) * self.baseMVA
+        branch_pf = (np.array(self.model.PF[:, :]())
+                     .reshape(self.NT, self.NBR) * self.baseMVA)
         results_pf = pd.DataFrame(branch_pf, index=self.timestamp_list)
         variables['PF'] = results_pf
 
         # Load power consumption
-        results_pl = np.array(self.model.PL[:, :]()).reshape(self.NT, self.NL) * self.baseMVA
+        results_pl = (np.array(self.model.PL[:, :]())
+                      .reshape(self.NT, self.NL) * self.baseMVA)
         results_pl = pd.DataFrame(results_pl, index=self.timestamp_list)
         variables['PL'] = results_pl
 
@@ -970,13 +991,16 @@ class NYGrid:
 
         if self.UsePTDF:
             # Bus power injection
-            results_pbus = np.array(self.model.PBUS[:, :]()).reshape(self.NT, self.NB) * self.baseMVA
-            results_pbus = pd.DataFrame(results_pbus, index=self.timestamp_list)
+            results_pbus = (np.array(self.model.PBUS[:, :]())
+                            .reshape(self.NT, self.NB) * self.baseMVA)
+            results_pbus = pd.DataFrame(results_pbus, 
+                                        index=self.timestamp_list)
             variables['PBUS'] = results_pbus
         else:
             # Bus phase angle
-            results_va = np.array(self.model.VA[:, :]()).reshape(self.NT, self.NB) * 180 / np.pi
-            # Just to co22mpare with PyPower
+            results_va = (np.array(self.model.VA[:, :]())
+                          .reshape(self.NT, self.NB) * 180 / np.pi)
+            # Just to compare with PyPower
             results_va = results_va - 73.4282
             # Convert negative numbers to 0-360
             results_va = np.where(results_va < 0, results_va + 360, results_va)
@@ -985,16 +1009,22 @@ class NYGrid:
 
         # Storage power and state of charge
         if self.NESR > 0:
-            results_esrPCrg = np.array(self.model.esrPCrg[:, :]()).reshape(self.NT, self.NESR) * self.baseMVA
-            results_esrPCrg = pd.DataFrame(results_esrPCrg, index=self.timestamp_list)
+            results_esrPCrg = (np.array(self.model.esrPCrg[:, :]())
+                               .reshape(self.NT, self.NESR) * self.baseMVA)
+            results_esrPCrg = pd.DataFrame(results_esrPCrg, 
+                                           index=self.timestamp_list)
             variables['esrPCrg'] = results_esrPCrg
 
-            results_esrPDis = np.array(self.model.esrPDis[:, :]()).reshape(self.NT, self.NESR) * self.baseMVA
-            results_esrPDis = pd.DataFrame(results_esrPDis, index=self.timestamp_list)
+            results_esrPDis = (np.array(self.model.esrPDis[:, :]())
+                               .reshape(self.NT, self.NESR) * self.baseMVA)
+            results_esrPDis = pd.DataFrame(results_esrPDis, 
+                                           index=self.timestamp_list)
             variables['esrPDis'] = results_esrPDis
 
-            results_esrSOC = np.array(self.model.esrSOC[:, :]()).reshape(self.NT, self.NESR) * self.baseMVA
-            results_esrSOC = pd.DataFrame(results_esrSOC, index=self.timestamp_list)
+            results_esrSOC = (np.array(self.model.esrSOC[:, :]())
+                              .reshape(self.NT, self.NESR) * self.baseMVA)
+            results_esrSOC = pd.DataFrame(results_esrSOC, 
+                                          index=self.timestamp_list)
             variables['esrSOC'] = results_esrSOC
 
         # %% Prices and dual variables
@@ -1004,27 +1034,35 @@ class NYGrid:
             results_lmp = np.zeros((self.NT, self.NB))
             for t in range(self.NT):
                 for n in range(self.NL):
-                    results_lmp[t, n] = np.abs(self.model.dual[self.model.c_load_set[t, n]]) / self.baseMVA
+                    results_lmp[t, n] = (np.abs(self.model.dual[
+                        self.model.c_load_set[t, n]]) / self.baseMVA)
             results_lmp = pd.DataFrame(results_lmp, index=self.timestamp_list)
             variables['LMP'] = results_lmp
         else:
             results_lmp = np.zeros((self.NT, self.NB))
             for t in range(self.NT):
                 for n in range(self.NB):
-                    results_lmp[t, n] = np.abs(self.model.dual[self.model.c_pf[t, n]]) / self.baseMVA
+                    results_lmp[t, n] = (np.abs(self.model.dual[
+                        self.model.c_pf[t, n]]) / self.baseMVA)
             results_lmp = pd.DataFrame(results_lmp, index=self.timestamp_list)
-            variables['LMP'] = results_lmp            
+            variables['LMP'] = results_lmp
 
         # %% Slack variables
 
-        results_s_ramp_down = np.array(self.model.s_ramp_down[:, :]()).reshape(self.NT, self.NG) * self.baseMVA
-        results_s_ramp_up = np.array(self.model.s_ramp_up[:, :]()).reshape(self.NT, self.NG) * self.baseMVA
+        results_s_ramp_down = (np.array(self.model.s_ramp_down[:, :]())
+                               .reshape(self.NT, self.NG) * self.baseMVA)
+        results_s_ramp_up = (np.array(self.model.s_ramp_up[:, :]())
+                             .reshape(self.NT, self.NG) * self.baseMVA)
         results_s_over_gen = np.array(self.model.s_over_gen[:]()) * self.baseMVA
         results_s_load_shed = np.array(self.model.s_load_shed[:]()) * self.baseMVA
-        results_s_if_max = np.array(self.model.s_if_max[:, :]()).reshape(self.NT, self.NIF) * self.baseMVA
-        results_s_if_min = np.array(self.model.s_if_min[:, :]()).reshape(self.NT, self.NIF) * self.baseMVA
-        results_s_br_max = np.array(self.model.s_br_max[:, :]()).reshape(self.NT, self.NBR) * self.baseMVA
-        results_s_br_min = np.array(self.model.s_br_min[:, :]()).reshape(self.NT, self.NBR) * self.baseMVA
+        results_s_if_max = (np.array(self.model.s_if_max[:, :]())
+                            .reshape(self.NT, self.NIF) * self.baseMVA)
+        results_s_if_min = (np.array(self.model.s_if_min[:, :]())
+                            .reshape(self.NT, self.NIF) * self.baseMVA)
+        results_s_br_max = (np.array(self.model.s_br_max[:, :]())
+                            .reshape(self.NT, self.NBR) * self.baseMVA)
+        results_s_br_min = (np.array(self.model.s_br_min[:, :]())
+                            .reshape(self.NT, self.NBR) * self.baseMVA)
 
         slack_vars = {
             's_ramp_up': results_s_ramp_up,
@@ -1037,44 +1075,50 @@ class NYGrid:
             's_br_min': results_s_br_min
         }
 
+        # Storage related slack variables
+        if self.NESR > 0:
+            results_s_esr_pcrg = (np.array(self.model.s_esr_pcrg[:, :]())
+                                  .reshape(self.NT, self.NESR) * self.baseMVA)
+            results_s_esr_pdis = (np.array(self.model.s_esr_pdis[:, :]())
+                                  .reshape(self.NT, self.NESR) * self.baseMVA)
+            results_s_esr_soc_min = (np.array(self.model.s_esr_soc_min[:, :]())
+                                     .reshape(self.NT, self.NESR) * self.baseMVA)
+            results_s_esr_soc_max = (np.array(self.model.s_esr_soc_max[:, :]())
+                                     .reshape(self.NT, self.NESR) * self.baseMVA)
+            results_s_esr_soc_overt = (np.array(self.model.s_esr_soc_overt[:, :]())
+                                       .reshape(self.NT, self.NESR) * self.baseMVA)
+            results_s_esr_soc_undert = (np.array(self.model.s_esr_soc_undert[:, :]())
+                                        .reshape(self.NT, self.NESR) * self.baseMVA)
+
+            slack_vars['s_esr_pcrg'] = results_s_esr_pcrg
+            slack_vars['s_esr_pdis'] = results_s_esr_pdis
+            slack_vars['s_esr_soc_min'] = results_s_esr_soc_min
+            slack_vars['s_esr_soc_max'] = results_s_esr_soc_max
+            slack_vars['s_esr_soc_overt'] = results_s_esr_soc_overt
+            slack_vars['s_esr_soc_undert'] = results_s_esr_soc_undert
+
         # %% Cost and penalties
 
         pg_pu = np.array(self.model.PG[:, :]()).reshape(self.NT, self.NG)
-        gen_cost = sum(self.gencost_0[t, g] + self.gencost_1[t, g] * pg_pu[t, g]
-                       for g in range(self.NG) for t in range(self.NT))
-            
-        over_gen_penalty = sum(self.PenaltyForOverGeneration * results_s_over_gen[t]
-                               for t in range(self.NT))
-        load_shed_penalty = sum(self.PenaltyForLoadShed * results_s_load_shed[t]
-                                for t in range(self.NT))
-        ramp_up_penalty = sum(self.PenaltyForRampViolation * results_s_ramp_up[t, g]
-                              for g in range(self.NG) for t in range(self.NT))
-        ramp_down_penalty = sum(self.PenaltyForRampViolation * results_s_ramp_down[t, g]
-                                for g in range(self.NG) for t in range(self.NT))
-        if_max_penalty = sum(self.PenaltyForInterfaceMWViolation * results_s_if_max[t, n]
-                             for n in range(self.NIF) for t in range(self.NT))
-        if_min_penalty = sum(self.PenaltyForInterfaceMWViolation * results_s_if_min[t, n]
-                             for n in range(self.NIF) for t in range(self.NT))
-        br_max_penalty = sum(self.PenaltyForBranchMwViolation * results_s_br_max[t, n]
-                             for n in range(self.NBR) for t in range(self.NT))
-        br_min_penalty = sum(self.PenaltyForBranchMwViolation * results_s_br_min[t, n]
-                             for n in range(self.NBR) for t in range(self.NT))
+        gen_cost = self.gencost_0 + self.gencost_1 * pg_pu
 
-        total_cost = (gen_cost + over_gen_penalty + load_shed_penalty
-                      + ramp_up_penalty + ramp_down_penalty
-                      + if_max_penalty + if_min_penalty
-                      + br_max_penalty + br_min_penalty)
-        
-        if self.NESR > 0:
-            esr_pcrg_pu = np.array(self.model.esrPCrg[:, :]()).reshape(self.NT, self.NESR)
-            esr_pdis_pu = np.array(self.model.esrPDis[:, :]()).reshape(self.NT, self.NESR)
-            esr_cost = sum(self.esrcost_crg[t, n] * esr_pcrg_pu[t, n] 
-                           + self.esrcost_dis[t, n] * esr_pdis_pu[t, n]
-                           for n in range(self.NESR) for t in range(self.NT))
-            total_cost = total_cost + esr_cost
-        
+        over_gen_penalty = self.PenaltyForOverGeneration * results_s_over_gen / self.baseMVA
+        load_shed_penalty = self.PenaltyForLoadShed * results_s_load_shed / self.baseMVA
+        ramp_up_penalty = self.PenaltyForRampViolation * results_s_ramp_up / self.baseMVA
+        ramp_down_penalty = self.PenaltyForRampViolation * results_s_ramp_down / self.baseMVA
+        if_max_penalty = self.PenaltyForInterfaceMWViolation * results_s_if_max / self.baseMVA
+        if_min_penalty = self.PenaltyForInterfaceMWViolation * results_s_if_min / self.baseMVA
+        br_max_penalty = self.PenaltyForBranchMwViolation * results_s_br_max / self.baseMVA
+        br_min_penalty = self.PenaltyForBranchMwViolation * results_s_br_min / self.baseMVA
+
+        total_cost = gen_cost.sum()
+        total_penalty = (over_gen_penalty.sum() + load_shed_penalty.sum()
+                         + ramp_up_penalty.sum() + ramp_down_penalty.sum()
+                         + if_max_penalty.sum() + if_min_penalty.sum()
+                         + br_max_penalty.sum() + br_min_penalty.sum())
+        total_cost_penalty = total_cost + total_penalty
+
         costs = {
-            'total_cost': total_cost,
             'gen_cost': gen_cost,
             'over_gen_penalty': over_gen_penalty,
             'load_shed_penalty': load_shed_penalty,
@@ -1087,14 +1131,53 @@ class NYGrid:
         }
 
         if self.NESR > 0:
-            costs['esr_cost'] = esr_cost
+            esr_pcrg_pu = (np.array(self.model.esrPCrg[:, :]())
+                           .reshape(self.NT, self.NESR))
+            esr_pdis_pu = (np.array(self.model.esrPDis[:, :]())
+                           .reshape(self.NT, self.NESR))
+            esr_cost = - self.esrcost_crg * esr_pcrg_pu + \
+                self.esrcost_dis * esr_pdis_pu
 
-        # Combine results
+            esr_pcrg_penalty = self.PenaltyForESRPowerViolation * \
+                results_s_esr_pcrg / self.baseMVA
+            esr_pdis_penalty = self.PenaltyForESRPowerViolation * \
+                results_s_esr_pdis / self.baseMVA
+            esr_soc_max_penalty = self.PenaltyForESRSOCLimitViolation * \
+                results_s_esr_soc_max / self.baseMVA
+            esr_soc_min_penalty = self.PenaltyForESRSOCLimitViolation * \
+                results_s_esr_soc_min / self.baseMVA
+            esr_soc_overt_penalty = self.PenaltyForESRSOCTargetViolation * \
+                results_s_esr_soc_overt / self.baseMVA
+            esr_soc_undert_penalty = self.PenaltyForESRSOCTargetViolation * \
+                results_s_esr_soc_undert / self.baseMVA
+
+            costs['esr_cost'] = esr_cost
+            costs['esr_pcrg_penalty'] = esr_pcrg_penalty
+            costs['esr_pdis_penalty'] = esr_pdis_penalty
+            costs['esr_soc_max_penalty'] = esr_soc_max_penalty
+            costs['esr_soc_min_penalty'] = esr_soc_min_penalty
+            costs['esr_soc_overt_penalty'] = esr_soc_overt_penalty
+            costs['esr_soc_undert_penalty'] = esr_soc_undert_penalty
+
+            total_cost = total_cost + esr_cost.sum()
+            total_penalty = (total_penalty 
+                             + esr_pcrg_penalty.sum()
+                             + esr_pdis_penalty.sum() 
+                             + esr_soc_max_penalty.sum()
+                             + esr_soc_min_penalty.sum() 
+                             + esr_soc_overt_penalty.sum()
+                             + esr_soc_undert_penalty.sum())
+            total_cost_penalty = total_cost + total_penalty
+
+        costs['total_cost'] = total_cost
+        costs['total_penalty'] = total_penalty
+        costs['total_cost_penalty'] = total_cost_penalty
+
+        # %% Combine results
         results = {**variables, **slack_vars, **costs}
 
         return results
 
-    
     def show_model_dim(self) -> None:
         """
         Show model dimensions.
@@ -1110,7 +1193,6 @@ class NYGrid:
         num_constraints = self.model.nconstraints()
         logging.info('Number of constraints: {}'.format(num_constraints))
 
-    
     def get_last_gen(self, model_multi_opf: pyo.ConcreteModel) -> np.ndarray:
         """
         Get generator power generation at the last simulation.
@@ -1119,7 +1201,8 @@ class NYGrid:
         # Get dimensions of the last simulation
         NT = len(model_multi_opf.PG_index_0)
         NG = len(model_multi_opf.PG_index_1)
-        results_pg = np.array(model_multi_opf.PG[:, :]()).reshape(NT, NG) * self.baseMVA
+        results_pg = (np.array(model_multi_opf.PG[:, :]())
+                      .reshape(NT, NG) * self.baseMVA)
         last_gen = results_pg[-1, :]
 
         return last_gen

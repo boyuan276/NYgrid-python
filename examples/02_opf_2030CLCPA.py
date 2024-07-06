@@ -1,6 +1,6 @@
 """
 Run multi-period OPF with 2018 data.
-12. With ESR, CPNY, VRE and electrification case:
+2. With ESR, CPNY, VRE and electrification case:
 Add CPNY and CHPE HVDC lines.
 Add 6 GW ESRs.
 Add future solar and offshore wind.
@@ -31,12 +31,10 @@ if __name__ == '__main__':
     w_vre = True  # True: add future solar and offshore wind; False: no future solar and offshore wind
     w_elec = True  # True: add residential building electrification; False: no residential building electrification
 
-    # NOTE: Scale down residential load change by 50%
-    elec_ratio = 0.5  # Ratio of residential building electrification
-
     start_date = datetime(2018, 1, 1, 0, 0, 0)
     end_date = datetime(2018, 12, 31, 0, 0, 0)
     timestamp_list = pd.date_range(start_date, end_date, freq='1D')
+    verbose = False
 
     if 'examples' in os.getcwd():
         os.chdir('../')
@@ -66,12 +64,6 @@ if __name__ == '__main__':
     results_dir = os.path.join(os.path.dirname(data_dir), 'results')
     logging.info('Results directory: {}'.format(results_dir))
 
-    renewable_data_dir = os.path.join(data_dir, 'renewable')
-    print('Renewable data directory: {}'.format(renewable_data_dir))
-
-    load_data_dir = os.path.join(data_dir, 'load')
-    print('Load data directory: {}'.format(load_data_dir))
-
     sim_results_dir = os.path.join(results_dir, sim_name)
     if not os.path.exists(sim_results_dir):
         os.mkdir(sim_results_dir)
@@ -80,31 +72,11 @@ if __name__ == '__main__':
 
     # %% Read grid data
 
+    # Read grid property file
+    grid_prop = ng_run.read_grid_prop(grid_data_dir)
+    
     # Read load and generation profiles
-    grid_data = ng_run.read_grid_profile(grid_data_dir, start_date.year)
-
-    # Read DC line property file
-    filename = os.path.join(grid_data_dir, 'dcline_prop.csv')
-    dcline_prop = pd.read_csv(filename)
-
-    if w_cpny:
-        grid_data['dcline_prop'] = dcline_prop
-        # Existing and planned HVDC lines
-        logging.info('With CPNY and CHPE HVDC lines.')
-    else:
-        grid_data['dcline_prop'] = dcline_prop[:4]  # Only existing HVDC lines
-        logging.info('Without CPNY and CHPE HVDC lines.')
-
-    # Read ESR property file
-    filename = os.path.join(grid_data_dir, 'esr_prop.csv')
-    esr_prop = pd.read_csv(filename)
-
-    if w_esr:
-        logging.info('With ESRs.')
-        grid_data['esr_prop'] = esr_prop  # Existing and planned ESRs
-    else:
-        logging.info('No ESRs.')
-        grid_data['esr_prop'] = esr_prop[:8]  # Only existing ESRs
+    grid_profile = ng_run.read_grid_profile(grid_data_dir, start_date.year)
 
     # Read renewable generation profiles
     if w_vre:
@@ -124,10 +96,10 @@ if __name__ == '__main__':
         vre_prop, genmax_profile_vre = ng_run.read_vre_data(solar_data_dir,
                                                             onshore_wind_data_dir,
                                                             offshore_wind_data_dir)
-        grid_data['vre_prop'] = vre_prop
-        grid_data['genmax_profile_vre'] = genmax_profile_vre
+        grid_prop['vre_prop'] = vre_prop
+        grid_profile['genmax_profile_vre'] = genmax_profile_vre
         # NOTE: Make datetime index consistent
-        grid_data['genmax_profile_vre'].index = grid_data['genmax_profile'].index
+        grid_profile['genmax_profile_vre'].index = grid_profile['genmax_profile'].index
         logging.info('With future solar and offshore wind.')
 
     else:
@@ -151,10 +123,10 @@ if __name__ == '__main__':
             electric_vehicle_data_dir))
 
         # Read NYS county attributes and county to bus mapping
-        county_attrs = pd.read_csv(os.path.join(
-            load_data_dir, 'county_attributes.csv'))
-        county_2_bus = pd.read_csv(os.path.join(
-            load_data_dir, 'county_2_bus.csv'))
+        county_attrs = pd.read_csv(os.path.join(data_dir,
+            'load', 'county_attributes.csv'))
+        county_2_bus = pd.read_csv(os.path.join(data_dir,
+            'load', 'county_2_bus.csv'))
 
         electrification_dict = {
             'res_building': {
@@ -178,7 +150,7 @@ if __name__ == '__main__':
                                                                 county_attrs,
                                                                 county_2_bus)
 
-        load_profile_elec = grid_data['load_profile'].copy()
+        load_profile_elec = grid_profile['load_profile'].copy()
 
         for sector, attrs in electrification_dict.items():
             load_change = attrs['load_change'] * attrs['scaling_factor']
@@ -187,7 +159,7 @@ if __name__ == '__main__':
 
         load_profile_elec = load_profile_elec.sort_index(axis=1)
         load_profile_elec = load_profile_elec.round(2)
-        grid_data['load_profile'] = load_profile_elec
+        grid_profile['load_profile'] = load_profile_elec
 
     else:
         logging.info('No residential building electrification.')
@@ -220,9 +192,14 @@ if __name__ == '__main__':
         start_datetime = timestamp_list[d]
         end_datetime = start_datetime + timedelta(hours=23 + leading_hours)
 
-        nygrid_results = ng_run.run_nygrid_one_day(start_datetime, end_datetime,
-                                                   grid_data, grid_data_dir,
-                                                   options, last_gen, last_soc)
+        nygrid_results = ng_run.run_nygrid_one_day(grid_prop=grid_prop,
+                                                   grid_profile=grid_profile,
+                                                   start_datetime=start_datetime,
+                                                   end_datetime=end_datetime,
+                                                   options=options,
+                                                   gen_init=last_gen,
+                                                   soc_init=last_soc,
+                                                   verbose=verbose)
 
         # Set generator initial condition for the next iteration
         last_gen = nygrid_results['PG'].loc[start_datetime].to_numpy(

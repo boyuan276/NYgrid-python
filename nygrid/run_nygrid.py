@@ -54,6 +54,9 @@ def read_grid_prop(grid_data_dir: Union[str, os.PathLike]
     filename = os.path.join(grid_data_dir, 'gencost_prop.csv')
     if os.path.exists(filename):
         gencost_prop = pd.read_csv(filename)
+        # Set negative cost to zero
+        gencost_prop['COST_0'] = gencost_prop['COST_0'].clip(lower=0)
+        gencost_prop['COST_1'] = gencost_prop['COST_1'].clip(lower=0)
     else:
         raise ValueError('Generator cost properties file does not exist.')
 
@@ -160,6 +163,18 @@ def read_grid_profile(data_dir: Union[str, os.PathLike],
 
     gencost1_profile = pd.read_csv(os.path.join(data_dir, f'gencost1_profile_{year}.csv'),
                                    parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+    
+    gencost_startup_profile = pd.read_csv(os.path.join(data_dir, f'gencost_startup_profile_{year}.csv'),
+                                      parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+    
+    gencost_shutdown_profile = pd.read_csv(os.path.join(data_dir, f'gencost_shutdown_profile_{year}.csv'),
+                                        parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+    
+    # Set negative cost to zero
+    gencost0_profile[gencost0_profile < 0] = 0
+    gencost1_profile[gencost1_profile < 0] = 0
+    gencost_startup_profile[gencost_startup_profile < 0] = 0
+    gencost_shutdown_profile[gencost_shutdown_profile < 0] = 0
 
     grid_profile = {
         'load_profile': load_profile,
@@ -169,6 +184,8 @@ def read_grid_profile(data_dir: Union[str, os.PathLike],
         'genramp30_profile': genramp30_profile,
         'gencost0_profile': gencost0_profile,
         'gencost1_profile': gencost1_profile,
+        'gencost_startup_profile': gencost_startup_profile,
+        'gencost_shutdown_profile': gencost_shutdown_profile
     }
 
     return grid_profile

@@ -351,7 +351,8 @@ class NYGrid:
                            .drop(columns=['BUS_ZONE']).to_numpy())
         self.ppc['gen'] = (self.grid_prop['gen_prop']
                            .drop(columns=['GEN_NAME', 'GEN_ZONE', 
-                                          'GEN_FUEL', 'CMT_KEY']).to_numpy())
+                                          'GEN_FUEL', 'CMT_KEY',
+                                          'MIN_UP_TIME', 'MIN_DOWN_TIME']).to_numpy())
         self.ppc['genfuel'] = (self.grid_prop['gen_fuel']
                                .drop(columns=['GEN_NAME']).to_numpy())
         self.ppc['gencost'] = (self.grid_prop['gencost_prop']
@@ -453,6 +454,15 @@ class NYGrid:
                                          self.vre_idx])
         # Number of must run generators
         self.NG_mustrun = len(self.gen_idx_mustrun)
+
+        # Generator min up/down time
+        self.min_up_time = np.zeros(self.NG)
+        self.min_up_time[self.gen_idx_non_cvt] = self.grid_prop['gen_prop']['MIN_UP_TIME'].to_numpy()
+        self.min_up_time = self.min_up_time.astype(int)
+
+        self.min_down_time = np.zeros(self.NG)
+        self.min_down_time[self.gen_idx_non_cvt] = self.grid_prop['gen_prop']['MIN_DOWN_TIME'].to_numpy()
+        self.min_down_time = self.min_down_time.astype(int)
 
         # Get mapping from load to bus
         self.load_map = np.zeros((self.NB, self.NL))
@@ -1224,7 +1234,7 @@ class NYGrid:
         gen_cost = self.gencost_1 * pg_pu
         gen_cost_noload = self.gencost_0[:, self.gen_idx_avail] * results_commit
         gen_cost_startup = self.gencost_startup[:, self.gen_idx_avail] * results_startup
-        gencost_shutdown = self.gencost_shutdown[:, self.gen_idx_avail] * results_shutdown
+        gen_cost_shutdown = self.gencost_shutdown[:, self.gen_idx_avail] * results_shutdown
 
         over_gen_penalty = self.PenaltyForOverGeneration * results_s_over_gen / self.baseMVA
         load_shed_penalty = self.PenaltyForLoadShed * results_s_load_shed / self.baseMVA
@@ -1246,7 +1256,7 @@ class NYGrid:
             'gen_cost': gen_cost,
             'gen_cost_noload': gen_cost_noload,
             'gen_cost_startup': gen_cost_startup,
-            'gencost_shutdown': gencost_shutdown,
+            'gen_cost_shutdown': gen_cost_shutdown,
             'over_gen_penalty': over_gen_penalty,
             'load_shed_penalty': load_shed_penalty,
             'ramp_up_penalty': ramp_up_penalty,

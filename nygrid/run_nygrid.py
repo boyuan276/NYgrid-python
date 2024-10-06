@@ -537,6 +537,7 @@ def run_nygrid_one_day(grid_prop: Dict[str, pd.DataFrame],
                        end_datetime: pd.Timestamp,
                        options: Dict[str, Any],
                        gen_init: Optional[np.ndarray],
+                       gen_init_cmt: Optional[np.ndarray],
                        soc_init: Optional[np.ndarray],
                        verbose: bool = False
                        ) -> Dict[str, pd.DataFrame]:
@@ -587,6 +588,9 @@ def run_nygrid_one_day(grid_prop: Dict[str, pd.DataFrame],
     nygrid_sim.set_gen_ramp_sch(grid_profile['genramp30_profile'])
     nygrid_sim.set_gen_cost_sch(grid_profile['gencost0_profile'],
                                 grid_profile['gencost1_profile'])
+    nygrid_sim.set_gen_cost_startup_sch(grid_profile['gencost_startup_profile'])
+    nygrid_sim.set_gen_cost_shutdown_sch(grid_profile['gencost_shutdown_profile'])
+
 
     if 'genmax_profile_vre' in grid_profile:
         nygrid_sim.set_vre_max_sch(grid_profile['genmax_profile_vre'])
@@ -596,6 +600,9 @@ def run_nygrid_one_day(grid_prop: Dict[str, pd.DataFrame],
 
     # Set generator initial condition
     nygrid_sim.set_gen_init_data(gen_init=gen_init)
+
+    # Set generator initial commitment condition
+    nygrid_sim.set_gen_init_cmt_data(gen_init_cmt=gen_init_cmt)
 
     # Set ESR initial condition
     nygrid_sim.set_esr_init_data(esr_init=soc_init)

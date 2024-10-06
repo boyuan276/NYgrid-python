@@ -34,7 +34,10 @@ class Optimizer:
         self.times = range(self.nygrid.NT)
         self.buses = range(self.nygrid.NB)
         self.branches = range(self.nygrid.NBR)
+        # Set of total generators
         self.generators = range(self.nygrid.NG)
+        # Set of generators that need to be committed (All - offline - mustrun)
+        self.generators_avail = range(self.nygrid.NG_avail)
         self.loads = range(self.nygrid.NL)
         self.interfaces = range(self.nygrid.NIF)
         self.dclines = range(self.nygrid.NDCL)
@@ -75,6 +78,27 @@ class Optimizer:
                                          within=pyo.NonNegativeReals, initialize=0)
 
         logging.debug('Added variables for ED module.')
+
+    def add_vars_uc(self):
+        """
+        Add variables for UC module.
+
+        Returns
+        -------
+        None
+        """
+
+        # Binary commitment state [1 if generator is on, 0 otherwise]
+        self.model.u = pyo.Var(self.times, self.generators_avail,
+                               within=pyo.Binary, initialize=0)
+        
+        # Binary startup states [1 if generator has a startup, 0 otherwise]
+        self.model.v = pyo.Var(self.times, self.generators_avail,
+                                 within=pyo.Binary, initialize=0)
+        
+        # Binary shutdown states [1 if generator has a shutdown, 0 otherwise]
+        self.model.w = pyo.Var(self.times, self.generators_avail,
+                                 within=pyo.Binary, initialize=0)
 
     def add_vars_pf(self):
         """
@@ -117,17 +141,6 @@ class Optimizer:
                                       within=pyo.NonNegativeReals, initialize=0)
 
         logging.debug('Added variables for PF module.')
-
-    def add_vars_uc(self):
-        """
-        Add variables for UC module.
-
-        Returns
-        -------
-        None
-        """
-
-        raise NotImplementedError('UC module is not implemented yet.')
 
     def add_vars_rs(self):
         """
@@ -190,8 +203,25 @@ class Optimizer:
 
         # Generator energy cost
         def gen_cost_ene_expr(model):
-            return sum(self.nygrid.gencost_0[t, g] + self.nygrid.gencost_1[t, g] * model.PG[t, g]
-                       for g in self.generators for t in self.times)
+            # return sum(self.nygrid.gencost_0[t, g] + self.nygrid.gencost_1[t, g] * model.PG[t, g]
+            #            for g in self.generators for t in self.times)
+            return sum(self.nygrid.gencost_1[t, g] * model.PG[t, g]
+                        for g in self.generators for t in self.times)
+        
+        # Generator unit commitment cost
+        def gen_cost_noload_expr(model):
+            return sum(self.nygrid.gencost_0[t, self.nygrid.gen_idx_avail[ga]] * model.u[t, ga]
+                       for ga in self.generators_avail for t in self.times)
+        
+        # Generator startup cost
+        def gen_cost_startup_expr(model):
+            return sum(self.nygrid.gencost_startup[t, self.nygrid.gen_idx_avail[ga]] * model.v[t, ga]
+                       for ga in self.generators_avail for t in self.times)
+        
+        # Generator shutdown cost
+        def gen_cost_shutdown_expr(model):
+            return sum(self.nygrid.gencost_shutdown[t, self.nygrid.gen_idx_avail[ga]] * model.w[t, ga]
+                       for ga in self.generators_avail for t in self.times)
 
         # ESR energy cost
         def esr_cost_ene_expr(model):
@@ -199,10 +229,12 @@ class Optimizer:
                        + self.nygrid.esrcost_dis[t, esr] * model.esrPDis[t, esr]
                        for esr in self.esrs for t in self.times)
 
+        # Penalty for over generation at system level
         def over_gen_penalty_expr(model):
             return sum(model.s_over_gen[t] for t in self.times) * \
                 self.nygrid.PenaltyForOverGeneration
 
+        # Penalty for load shedding at system level
         def load_shed_penalty_expr(model):
             return sum(model.s_load_shed[t] for t in self.times) * \
                 self.nygrid.PenaltyForLoadShed
@@ -230,49 +262,60 @@ class Optimizer:
                        for n in self.interfaces for t in self.times) * \
                         self.nygrid.PenaltyForInterfaceMWViolation
 
-        # Penalty for violating branch flow limits
+        # Penalty for violating branch flow upper limits
         def br_max_penalty_expr(model):
             return sum(model.s_br_max[t, n]
                        for n in self.branches for t in self.times) * \
                         self.nygrid.PenaltyForBranchMwViolation
 
+        # Penalty for violating branch flow lower limits
         def br_min_penalty_expr(model):
             return sum(model.s_br_min[t, n]
                        for n in self.branches for t in self.times) * \
                         self.nygrid.PenaltyForBranchMwViolation
 
+        # Penalty for violating ESR charging power limits
         def esr_pcrg_penalty_expr(model):
             return sum(model.s_esr_pcrg[t, esr]
                        for esr in self.esrs for t in self.times) * \
                         self.nygrid.PenaltyForESRPowerViolation
 
+        # Penalty for violating ESR discharging power limits
         def esr_pdis_penalty_expr(model):
             return sum(model.s_esr_pdis[t, esr]
                        for esr in self.esrs for t in self.times) * \
                         self.nygrid.PenaltyForESRPowerViolation
 
+        # Penalty for violating ESR SOC upper limits
         def esr_soc_max_penalty_expr(model):
             return sum(model.s_esr_soc_max[t, esr]
                        for esr in self.esrs for t in self.times) * \
                         self.nygrid.PenaltyForESRSOCLimitViolation
 
+        # Penalty for violating ESR SOC lower limits
         def esr_soc_min_penalty_expr(model):
             return sum(model.s_esr_soc_min[t, esr]
                        for esr in self.esrs for t in self.times) * \
                         self.nygrid.PenaltyForESRSOCLimitViolation
 
+        # Penalty for terminal SOC greater than target
         def esr_soc_overt_penalty_expr(model):
             return sum(model.s_esr_soc_overt[t, esr]
                        for esr in self.esrs for t in self.times) * \
                         self.nygrid.PenaltyForESRSOCTargetViolation
 
+        # Penalty for terminal SOC less than target
         def esr_soc_undert_penalty_expr(model):
             return sum(model.s_esr_soc_undert[t, esr]
                        for esr in self.esrs for t in self.times) * \
                         self.nygrid.PenaltyForESRSOCTargetViolation
 
+        # Objective function
         self.model.obj = pyo.Objective(expr=(
-            gen_cost_ene_expr(self.model) 
+            gen_cost_ene_expr(self.model)
+            + gen_cost_noload_expr(self.model)
+            + gen_cost_startup_expr(self.model)
+            + gen_cost_shutdown_expr(self.model)
             + esr_cost_ene_expr(self.model)
             + over_gen_penalty_expr(self.model) 
             + load_shed_penalty_expr(self.model)
@@ -362,6 +405,75 @@ class Optimizer:
         self.model.c_load_set = pyo.Constraint(self.times, self.loads,
                                                rule=load_power_rule)
 
+    def add_constrs_uc(self):
+        """
+        Add constraints for UC module.
+
+        Returns
+        _______
+        None
+        """
+
+        # 1.1. Generator real power output upper limit with commitment status
+        def gen_power_max_cmt_rule(model, t, ga):
+            g = self.nygrid.gen_idx_avail[ga]
+            return model.PG[t, g] <= self.nygrid.gen_max[t, g] * model.u[t, ga]
+        
+        self.model.c_gen_max_cmt = pyo.Constraint(self.times, self.generators_avail,
+                                                rule=gen_power_max_cmt_rule)
+        
+        # 1.2. Generator real power output lower limit with commitment status
+        def gen_power_min_cmt_rule(model, t, ga):
+            g = self.nygrid.gen_idx_avail[ga]
+            return model.PG[t, g] >= self.nygrid.gen_min[t, g] * model.u[t, ga]
+        
+        self.model.c_gen_min_cmt = pyo.Constraint(self.times, self.generators_avail,
+                                                rule=gen_power_min_cmt_rule)
+        
+        # 2.1. Generator commitment status
+        def gen_commit_rule(model, t, ga):
+            g = self.nygrid.gen_idx_avail[ga]
+            if t == 0:
+                if self.nygrid.gen_init_cmt is not None:
+                    return model.u[t, ga] == self.nygrid.gen_init_cmt[ga] \
+                        + model.v[t, ga] - model.w[t, ga]
+                else:
+                    return pyo.Constraint.Skip
+            else:
+                return model.u[t, ga] == model.u[t - 1, ga] \
+                    + model.v[t, ga] - model.w[t, ga]
+
+        self.model.c_gen_commitment = pyo.Constraint(self.times, self.generators_avail,
+                                                    rule=gen_commit_rule)
+        
+        def gen_commit_rule_2(model, t, ga):
+            return model.v[t, ga] + model.w[t, ga] <= 1
+        
+        self.model.c_gen_commitment_2 = pyo.Constraint(self.times, self.generators_avail,
+                                                    rule=gen_commit_rule_2)
+
+        # # 2.2. Generator minimum down time constraint # FIXME: min_up_time is not defined
+        # def gen_min_up_time_rule(model, t, ga):
+        #     g = self.nygrid.gen_idx_avail[ga]
+        #     if t < self.nygrid.min_up_time[g]:
+        #         return pyo.Constraint.Skip
+        #     else:
+        #         return sum(model.v[t - self.nygrid.min_up_time[g] + 1:t, ga]) <= model.u[t, ga]
+
+        # self.model.c_gen_min_down_time = pyo.Constraint(self.times, self.generators_avail,
+        #                                                 rule=gen_min_down_time_rule)
+
+        # # 2.3. Generator minimum up time constraint # FIXME: add min_down_time parameter
+        # def gen_min_down_time_rule(model, t, ga):
+        #     g = self.nygrid.gen_idx_avail[ga]
+        #     if t < self.nygrid.min_down_time[g]:
+        #         return pyo.Constraint.Skip
+        #     else:
+        #         return sum(model.w[t - self.nygrid.min_down_time[g] + 1:t, ga]) <= 1 - model.u[t, ga]
+
+        # self.model.c_gen_min_up_time = pyo.Constraint(self.times, self.generators_avail,
+        #                                               rule=gen_min_up_time_rule)   
+    
     def add_constrs_pf(self):
         """
         Add constraints for PF module.
@@ -452,17 +564,6 @@ class Optimizer:
                                              rule=interface_flow_min_rule)
 
         logging.debug('Added constraints for PF module.')
-
-    def add_constrs_uc(self):
-        """
-        Add constraints for UC module.
-
-        Returns
-        _______
-        None
-        """
-
-        raise NotImplementedError('UC module is not implemented yet.')
 
     def add_constrs_rs(self):
         """

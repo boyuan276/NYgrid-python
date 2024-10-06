@@ -9,6 +9,8 @@ from pypower.idx_cost import MODEL, STARTUP, SHUTDOWN, NCOST, POLYNOMIAL, COST
 
 # Define index for generator commitment keys
 CMT_KEY = 24
+MIN_UP_TIME = 25
+MIN_DOWN_TIME = 26
 OFFLINE = -1
 AVAILABLE = 1
 MUSTRUN = 2

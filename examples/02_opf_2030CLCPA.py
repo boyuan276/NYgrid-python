@@ -20,7 +20,6 @@ import pandas as pd
 
 import nygrid.run_nygrid as ng_run
 
-
 if __name__ == '__main__':
 
     # %% Simulation settings
@@ -166,15 +165,8 @@ if __name__ == '__main__':
         logging.info('No residential building electrification.')
 
     # %% Modify grid data
-    # Set generator lower bounds to zero
-    grid_prop['gen_prop']['PMIN'] = np.where(grid_prop['gen_prop']['PMIN'] > 0,
-                                            0, grid_prop['gen_prop']['PMIN'])
-    grid_profile_zero = np.where(grid_profile['genmin_profile'] > 0,
-                                0, grid_profile['genmin_profile'])
-    grid_profile['genmin_profile'] = pd.DataFrame(grid_profile_zero, index=grid_profile['genmin_profile'].index,
-                                                    columns=grid_profile['genmin_profile'].columns)
 
-    # Increase CT and ST generation costs
+    # Increase CT and ST generation costs for energy
     ct_index = grid_prop["gen_prop"]["GEN_FUEL"].isin(
         ["Combustion Turbine", "Internal Combustion", "Jet Engine"]
     ).to_numpy()
@@ -184,6 +176,12 @@ if __name__ == '__main__':
     gencost1_profile_new.loc[:, ct_index] = gencost1_profile_new.loc[:, ct_index] * 3
     gencost1_profile_new.loc[:, st_index] = gencost1_profile_new.loc[:, st_index] * 3
     grid_profile['gencost1_profile'] = gencost1_profile_new
+
+    # Increase CT and ST generation costs for startup
+    gencost_startup_profile_new = grid_profile['gencost_startup_profile'].copy()
+    gencost_startup_profile_new.loc[:, ct_index] = gencost_startup_profile_new.loc[:, ct_index] * 3
+    gencost_startup_profile_new.loc[:, st_index] = gencost_startup_profile_new.loc[:, st_index] * 3
+    grid_profile['gencost_startup_profile'] = gencost_startup_profile_new
 
     # %% Set up OPF model
 
@@ -198,6 +196,7 @@ if __name__ == '__main__':
 
     # No initial condition for the first day
     last_gen = None
+    last_gen_cmt = None
     last_soc = None
 
     # Loop through all days
@@ -219,22 +218,24 @@ if __name__ == '__main__':
                                                    end_datetime=end_datetime,
                                                    options=options,
                                                    gen_init=last_gen,
+                                                   gen_init_cmt=last_gen_cmt,
                                                    soc_init=last_soc,
                                                    verbose=verbose)
-
-        # Set generator initial condition for the next iteration
-        last_gen = nygrid_results['PG'].loc[start_datetime].to_numpy(
-        ).squeeze()
-
-        # Set ESR initial condition for the next iteration
-        last_soc = nygrid_results['esrSOC'].loc[start_datetime].to_numpy(
-        ).squeeze()
-
+        
         # Save simulation nygrid_results to pickle
         filename = f'nygrid_sim_{sim_name}_{start_datetime.strftime("%Y%m%d%H")}.pkl'
         with open(os.path.join(sim_results_dir, filename), 'wb') as f:
             pickle.dump(nygrid_results, f)
         logging.info(f'Saved simulation nygrid_results in {filename}')
+        
+        # Set initial conditions for the next iteration
+        end_datetime_day1 = start_datetime + timedelta(hours=23)
+        # Set generator initial condition
+        last_gen = nygrid_results['PG'].loc[end_datetime_day1].to_numpy().squeeze()
+        # Set generator commitment initial condition
+        last_gen_cmt = nygrid_results['genCommit'].loc[end_datetime_day1].to_numpy().squeeze()
+        # Set ESR initial condition
+        last_soc = nygrid_results['esrSOC'].loc[end_datetime_day1].to_numpy().squeeze()
 
         elapsed = time.time() - t
         logging.info(

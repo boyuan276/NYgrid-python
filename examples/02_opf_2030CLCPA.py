@@ -11,6 +11,7 @@ and electric vehicle electrification.
 
 import logging
 import os
+import numpy as np
 import pickle
 import time
 from datetime import datetime, timedelta
@@ -163,6 +164,26 @@ if __name__ == '__main__':
 
     else:
         logging.info('No residential building electrification.')
+
+    # %% Modify grid data
+    # Set generator lower bounds to zero
+    grid_prop['gen_prop']['PMIN'] = np.where(grid_prop['gen_prop']['PMIN'] > 0,
+                                            0, grid_prop['gen_prop']['PMIN'])
+    grid_profile_zero = np.where(grid_profile['genmin_profile'] > 0,
+                                0, grid_profile['genmin_profile'])
+    grid_profile['genmin_profile'] = pd.DataFrame(grid_profile_zero, index=grid_profile['genmin_profile'].index,
+                                                    columns=grid_profile['genmin_profile'].columns)
+
+    # Increase CT and ST generation costs
+    ct_index = grid_prop["gen_prop"]["GEN_FUEL"].isin(
+        ["Combustion Turbine", "Internal Combustion", "Jet Engine"]
+    ).to_numpy()
+    st_index = grid_prop["gen_prop"]["GEN_FUEL"].isin(["Steam Turbine"]).to_numpy()
+
+    gencost1_profile_new = grid_profile['gencost1_profile'].copy()
+    gencost1_profile_new.loc[:, ct_index] = gencost1_profile_new.loc[:, ct_index] * 3
+    gencost1_profile_new.loc[:, st_index] = gencost1_profile_new.loc[:, st_index] * 3
+    grid_profile['gencost1_profile'] = gencost1_profile_new
 
     # %% Set up OPF model
 

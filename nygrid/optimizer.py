@@ -452,7 +452,7 @@ class Optimizer:
         self.model.c_gen_commitment_2 = pyo.Constraint(self.times, self.generators_avail,
                                                     rule=gen_commit_rule_2)
 
-        # # 2.2. Generator minimum down time constraint # FIXME: min_up_time is not defined
+        # 2.2. Generator minimum down time constraint
         def gen_min_up_time_rule(model, t, ga):
             g = self.nygrid.gen_idx_avail[ga]
             if t < self.nygrid.min_up_time[g]:
@@ -462,12 +462,11 @@ class Optimizer:
                 for time in range(self.nygrid.min_up_time[g]):
                     startup_count += model.v[t - time, ga]
                 return startup_count <= model.u[t, ga]
-                # return sum(model.v[t - self.nygrid.min_up_time[g] + 1:t, ga]) <= model.u[t, ga]
 
         self.model.c_gen_min_up_time = pyo.Constraint(self.times, self.generators_avail,
                                                         rule=gen_min_up_time_rule)
 
-        # # 2.3. Generator minimum up time constraint # FIXME: add min_down_time parameter
+        # 2.3. Generator minimum up time constraint
         def gen_min_down_time_rule(model, t, ga):
             g = self.nygrid.gen_idx_avail[ga]
             if t < self.nygrid.min_down_time[g]:
@@ -477,7 +476,6 @@ class Optimizer:
                 for time in range(self.nygrid.min_down_time[g]):
                     shutdown_count += model.w[t - time, ga]
                 return shutdown_count <= 1- model.u[t, ga]
-                # return sum(model.w[t - self.nygrid.min_down_time[g] + 1:t, ga]) <= 1 - model.u[t, ga]
 
         self.model.c_gen_min_down_time = pyo.Constraint(self.times, self.generators_avail,
                                                       rule=gen_min_down_time_rule)   

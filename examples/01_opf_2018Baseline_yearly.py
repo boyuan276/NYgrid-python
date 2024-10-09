@@ -63,7 +63,9 @@ if __name__ == '__main__':
     results_dir = os.path.join(os.path.dirname(data_dir), 'results')
     logging.info('Results directory: {}'.format(results_dir))
 
-    sim_results_dir = os.path.join(results_dir, sim_name)
+    # NOTE: Change sim_results_dir to the directory where simulation results are saved
+    # sim_results_dir = os.path.join(results_dir, sim_name)
+    sim_results_dir = os.path.join(results_dir, 'cc_1.5x_ct_2x_st_3x')
     if not os.path.exists(sim_results_dir):
         os.mkdir(sim_results_dir)
         logging.info(
@@ -81,18 +83,20 @@ if __name__ == '__main__':
 
     # Increase CT and ST generation costs for energy
     ct_index = grid_prop["gen_prop"]["GEN_FUEL"].isin(
-        ["Combustion Turbine", "Internal Combustion", "Jet Engine"]
-    ).to_numpy()
+        ["Combustion Turbine", "Internal Combustion", "Jet Engine"]).to_numpy()
     st_index = grid_prop["gen_prop"]["GEN_FUEL"].isin(["Steam Turbine"]).to_numpy()
+    cc_index = grid_prop["gen_prop"]["GEN_FUEL"].isin(["Combined Cycle"]).to_numpy()
 
     gencost1_profile_new = grid_profile['gencost1_profile'].copy()
-    gencost1_profile_new.loc[:, ct_index] = gencost1_profile_new.loc[:, ct_index] * 3
+    gencost1_profile_new.loc[:, ct_index] = gencost1_profile_new.loc[:, ct_index] * 1.5
+    gencost1_profile_new.loc[:, cc_index] = gencost1_profile_new.loc[:, cc_index] * 2
     gencost1_profile_new.loc[:, st_index] = gencost1_profile_new.loc[:, st_index] * 3
     grid_profile['gencost1_profile'] = gencost1_profile_new
 
     # Increase CT and ST generation costs for startup
     gencost_startup_profile_new = grid_profile['gencost_startup_profile'].copy()
-    gencost_startup_profile_new.loc[:, ct_index] = gencost_startup_profile_new.loc[:, ct_index] * 3
+    gencost_startup_profile_new.loc[:, ct_index] = gencost_startup_profile_new.loc[:, ct_index] * 1.5
+    gencost_startup_profile_new.loc[:, cc_index] = gencost_startup_profile_new.loc[:, cc_index] * 2
     gencost_startup_profile_new.loc[:, st_index] = gencost_startup_profile_new.loc[:, st_index] * 3
     grid_profile['gencost_startup_profile'] = gencost_startup_profile_new
 

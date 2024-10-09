@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
     # Read grid property file
     grid_prop = ng_run.read_grid_prop(grid_data_dir)
-    
+
     # Read load and generation profiles
     grid_profile = ng_run.read_grid_profile(grid_data_dir, start_date.year)
 
@@ -124,9 +124,9 @@ if __name__ == '__main__':
 
         # Read NYS county attributes and county to bus mapping
         county_attrs = pd.read_csv(os.path.join(data_dir,
-            'load', 'county_attributes.csv'))
+                                                'load', 'county_attributes.csv'))
         county_2_bus = pd.read_csv(os.path.join(data_dir,
-            'load', 'county_2_bus.csv'))
+                                                'load', 'county_2_bus.csv'))
 
         electrification_dict = {
             'res_building': {
@@ -170,17 +170,23 @@ if __name__ == '__main__':
     ct_index = grid_prop["gen_prop"]["GEN_FUEL"].isin(
         ["Combustion Turbine", "Internal Combustion", "Jet Engine"]
     ).to_numpy()
-    st_index = grid_prop["gen_prop"]["GEN_FUEL"].isin(["Steam Turbine"]).to_numpy()
+    st_index = grid_prop["gen_prop"]["GEN_FUEL"].isin(
+        ["Steam Turbine"]).to_numpy()
 
     gencost1_profile_new = grid_profile['gencost1_profile'].copy()
-    gencost1_profile_new.loc[:, ct_index] = gencost1_profile_new.loc[:, ct_index] * 4
-    gencost1_profile_new.loc[:, st_index] = gencost1_profile_new.loc[:, st_index] * 4
+    gencost1_profile_new.loc[:,
+                             ct_index] = gencost1_profile_new.loc[:, ct_index] * 4
+    gencost1_profile_new.loc[:,
+                             st_index] = gencost1_profile_new.loc[:, st_index] * 4
     grid_profile['gencost1_profile'] = gencost1_profile_new
 
     # Increase CT and ST generation costs for startup
-    gencost_startup_profile_new = grid_profile['gencost_startup_profile'].copy()
-    gencost_startup_profile_new.loc[:, ct_index] = gencost_startup_profile_new.loc[:, ct_index] * 4
-    gencost_startup_profile_new.loc[:, st_index] = gencost_startup_profile_new.loc[:, st_index] * 4
+    gencost_startup_profile_new = grid_profile['gencost_startup_profile'].copy(
+    )
+    gencost_startup_profile_new.loc[:,
+                                    ct_index] = gencost_startup_profile_new.loc[:, ct_index] * 4
+    gencost_startup_profile_new.loc[:,
+                                    st_index] = gencost_startup_profile_new.loc[:, st_index] * 4
     grid_profile['gencost_startup_profile'] = gencost_startup_profile_new
 
     # %% Set up OPF model
@@ -199,48 +205,28 @@ if __name__ == '__main__':
     last_gen_cmt = None
     last_soc = None
 
-    # Loop through all days
-    for d in range(len(timestamp_list)):
-        t = time.time()
+    # Run for the entire year
+    d = 0
+    start_datetime = timestamp_list[d]
+    end_datetime = start_datetime + timedelta(hours=24*364+23)
+    print(f'Start time: {start_datetime}')
+    print(f'End time: {end_datetime}')
 
-        # Remove leading hours for the last day
-        if d == len(timestamp_list) - 1:
-            leading_hours = 0
+    nygrid_results = ng_run.run_nygrid_sim(grid_prop=grid_prop,
+                                            grid_profile=grid_profile,
+                                            start_datetime=start_datetime,
+                                            end_datetime=end_datetime,
+                                            options=options,
+                                            gen_init=last_gen,
+                                            gen_init_cmt=last_gen_cmt,
+                                            soc_init=last_soc,
+                                            verbose=verbose)
 
-        # Run OPF for one day (24 hours) plus leading hours
-        # The first day is valid, the leading hours are used to dispatch batteries properly
-        start_datetime = timestamp_list[d]
-        end_datetime = start_datetime + timedelta(hours=23 + leading_hours)
-
-        nygrid_results = ng_run.run_nygrid_one_day(grid_prop=grid_prop,
-                                                   grid_profile=grid_profile,
-                                                   start_datetime=start_datetime,
-                                                   end_datetime=end_datetime,
-                                                   options=options,
-                                                   gen_init=last_gen,
-                                                   gen_init_cmt=last_gen_cmt,
-                                                   soc_init=last_soc,
-                                                   verbose=verbose)
-        
-        # Save simulation nygrid_results to pickle
-        filename = f'nygrid_sim_{sim_name}_{start_datetime.strftime("%Y%m%d%H")}.pkl'
-        with open(os.path.join(sim_results_dir, filename), 'wb') as f:
-            pickle.dump(nygrid_results, f)
-        logging.info(f'Saved simulation nygrid_results in {filename}')
-        
-        # Set initial conditions for the next iteration
-        end_datetime_day1 = start_datetime + timedelta(hours=23)
-        # Set generator initial condition
-        last_gen = nygrid_results['PG'].loc[end_datetime_day1].to_numpy().squeeze()
-        # Set generator commitment initial condition
-        last_gen_cmt = nygrid_results['genCommit'].loc[end_datetime_day1].to_numpy().squeeze()
-        # Set ESR initial condition
-        last_soc = nygrid_results['esrSOC'].loc[end_datetime_day1].to_numpy().squeeze()
-
-        elapsed = time.time() - t
-        logging.info(
-            f'Finished running for {start_datetime.strftime("%Y-%m-%d")}. Elapsed time: {elapsed:.2f} seconds')
-        logging.info('-' * 80)
+    # Save simulation nygrid_results to pickle
+    filename = f'nygrid_sim_{sim_name}_{start_datetime.strftime("%Y")}_yearly.pkl'
+    with open(os.path.join(sim_results_dir, filename), 'wb') as f:
+        pickle.dump(nygrid_results, f)
+    logging.info(f'Saved simulation nygrid_results in {filename}')
 
     tot_elapsed = time.time() - prog_start
     logging.info(

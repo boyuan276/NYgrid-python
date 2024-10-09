@@ -163,13 +163,13 @@ def read_grid_profile(data_dir: Union[str, os.PathLike],
 
     gencost1_profile = pd.read_csv(os.path.join(data_dir, f'gencost1_profile_{year}.csv'),
                                    parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
-    
+
     gencost_startup_profile = pd.read_csv(os.path.join(data_dir, f'gencost_startup_profile_{year}.csv'),
-                                      parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
-    
+                                          parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+
     gencost_shutdown_profile = pd.read_csv(os.path.join(data_dir, f'gencost_shutdown_profile_{year}.csv'),
-                                        parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
-    
+                                           parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+
     # Set negative cost to zero
     gencost0_profile[gencost0_profile < 0] = 0
     gencost1_profile[gencost1_profile < 0] = 0
@@ -531,16 +531,16 @@ def read_electrification_data(electrification_dict: Dict[str, Any],
     return electrification_dict
 
 
-def run_nygrid_one_day(grid_prop: Dict[str, pd.DataFrame],
-                       grid_profile: Dict[str, pd.DataFrame],
-                       start_datetime: pd.Timestamp,
-                       end_datetime: pd.Timestamp,
-                       options: Dict[str, Any],
-                       gen_init: Optional[np.ndarray],
-                       gen_init_cmt: Optional[np.ndarray],
-                       soc_init: Optional[np.ndarray],
-                       verbose: bool = False
-                       ) -> Dict[str, pd.DataFrame]:
+def run_nygrid_sim(grid_prop: Dict[str, pd.DataFrame],
+                   grid_profile: Dict[str, pd.DataFrame],
+                   start_datetime: pd.Timestamp,
+                   end_datetime: pd.Timestamp,
+                   options: Dict[str, Any],
+                   gen_init: Optional[np.ndarray],
+                   gen_init_cmt: Optional[np.ndarray],
+                   soc_init: Optional[np.ndarray],
+                   verbose: bool = False
+                   ) -> Dict[str, pd.DataFrame]:
     """
     Run NYGrid simulation for one day
 
@@ -588,9 +588,10 @@ def run_nygrid_one_day(grid_prop: Dict[str, pd.DataFrame],
     nygrid_sim.set_gen_ramp_sch(grid_profile['genramp30_profile'])
     nygrid_sim.set_gen_cost_sch(grid_profile['gencost0_profile'],
                                 grid_profile['gencost1_profile'])
-    nygrid_sim.set_gen_cost_startup_sch(grid_profile['gencost_startup_profile'])
-    nygrid_sim.set_gen_cost_shutdown_sch(grid_profile['gencost_shutdown_profile'])
-
+    nygrid_sim.set_gen_cost_startup_sch(
+        grid_profile['gencost_startup_profile'])
+    nygrid_sim.set_gen_cost_shutdown_sch(
+        grid_profile['gencost_shutdown_profile'])
 
     if 'genmax_profile_vre' in grid_profile:
         nygrid_sim.set_vre_max_sch(grid_profile['genmax_profile_vre'])

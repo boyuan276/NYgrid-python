@@ -84,20 +84,29 @@ if __name__ == '__main__':
     # Increase CT and ST generation costs for energy
     ct_index = grid_prop["gen_prop"]["GEN_FUEL"].isin(
         ["Combustion Turbine", "Internal Combustion", "Jet Engine"]).to_numpy()
-    st_index = grid_prop["gen_prop"]["GEN_FUEL"].isin(["Steam Turbine"]).to_numpy()
-    cc_index = grid_prop["gen_prop"]["GEN_FUEL"].isin(["Combined Cycle"]).to_numpy()
+    st_index = grid_prop["gen_prop"]["GEN_FUEL"].isin(
+        ["Steam Turbine"]).to_numpy()
+    cc_index = grid_prop["gen_prop"]["GEN_FUEL"].isin(
+        ["Combined Cycle"]).to_numpy()
 
     gencost1_profile_new = grid_profile['gencost1_profile'].copy()
-    gencost1_profile_new.loc[:, ct_index] = gencost1_profile_new.loc[:, ct_index] * 1.5
-    gencost1_profile_new.loc[:, cc_index] = gencost1_profile_new.loc[:, cc_index] * 2
-    gencost1_profile_new.loc[:, st_index] = gencost1_profile_new.loc[:, st_index] * 3
+    gencost1_profile_new.loc[:,
+                             ct_index] = gencost1_profile_new.loc[:, ct_index] * 1.5
+    gencost1_profile_new.loc[:,
+                             cc_index] = gencost1_profile_new.loc[:, cc_index] * 2
+    gencost1_profile_new.loc[:,
+                             st_index] = gencost1_profile_new.loc[:, st_index] * 3
     grid_profile['gencost1_profile'] = gencost1_profile_new
 
     # Increase CT and ST generation costs for startup
-    gencost_startup_profile_new = grid_profile['gencost_startup_profile'].copy()
-    gencost_startup_profile_new.loc[:, ct_index] = gencost_startup_profile_new.loc[:, ct_index] * 1.5
-    gencost_startup_profile_new.loc[:, cc_index] = gencost_startup_profile_new.loc[:, cc_index] * 2
-    gencost_startup_profile_new.loc[:, st_index] = gencost_startup_profile_new.loc[:, st_index] * 3
+    gencost_startup_profile_new = grid_profile['gencost_startup_profile'].copy(
+    )
+    gencost_startup_profile_new.loc[:,
+                                    ct_index] = gencost_startup_profile_new.loc[:, ct_index] * 1.5
+    gencost_startup_profile_new.loc[:,
+                                    cc_index] = gencost_startup_profile_new.loc[:, cc_index] * 2
+    gencost_startup_profile_new.loc[:,
+                                    st_index] = gencost_startup_profile_new.loc[:, st_index] * 3
     grid_profile['gencost_startup_profile'] = gencost_startup_profile_new
 
     # %% Set up OPF model
@@ -129,34 +138,37 @@ if __name__ == '__main__':
         start_datetime = timestamp_list[d]
         end_datetime = start_datetime + timedelta(hours=23 + leading_hours)
 
-        nygrid_results = ng_run.run_nygrid_one_day(grid_prop=grid_prop,
-                                                   grid_profile=grid_profile,
-                                                   start_datetime=start_datetime,
-                                                   end_datetime=end_datetime,
-                                                   options=options,
-                                                   gen_init=last_gen,
-                                                   gen_init_cmt=last_gen_cmt,
-                                                   soc_init=last_soc,
-                                                   verbose=verbose)
+        nygrid_results = ng_run.run_nygrid_sim(grid_prop=grid_prop,
+                                               grid_profile=grid_profile,
+                                               start_datetime=start_datetime,
+                                               end_datetime=end_datetime,
+                                               options=options,
+                                               gen_init=last_gen,
+                                               gen_init_cmt=last_gen_cmt,
+                                               soc_init=last_soc,
+                                               verbose=verbose)
 
         # Save simulation nygrid_results to pickle
         filename = f'nygrid_sim_{sim_name}_{start_datetime.strftime("%Y%m%d%H")}.pkl'
         with open(os.path.join(sim_results_dir, filename), 'wb') as f:
             pickle.dump(nygrid_results, f)
         logging.info(f'Saved simulation nygrid_results in {filename}')
-        
+
         # Set initial conditions for the next iteration
         end_datetime_day1 = start_datetime + timedelta(hours=23)
         # Set generator initial condition
-        last_gen = nygrid_results['PG'].loc[end_datetime_day1].to_numpy().squeeze()
+        last_gen = nygrid_results['PG'].loc[end_datetime_day1].to_numpy(
+        ).squeeze()
         # Set generator commitment initial condition
-        last_gen_cmt = nygrid_results['genCommit'].loc[end_datetime_day1].to_numpy().squeeze()
+        last_gen_cmt = nygrid_results['genCommit'].loc[end_datetime_day1].to_numpy(
+        ).squeeze()
         # Set ESR initial condition
-        last_soc = nygrid_results['esrSOC'].loc[end_datetime_day1].to_numpy().squeeze()
+        last_soc = nygrid_results['esrSOC'].loc[end_datetime_day1].to_numpy(
+        ).squeeze()
 
         elapsed = time.time() - t
-        logging.info(
-            f'Finished running for {start_datetime.strftime("%Y-%m-%d")}. Elapsed time: {elapsed:.2f} seconds')
+        logging.info(f'Finished running for {start_datetime.strftime("%Y-%m-%d")}.')
+        logging.info(f'Elapsed time: {elapsed:.2f} seconds')
         logging.info('-' * 80)
 
     tot_elapsed = time.time() - prog_start

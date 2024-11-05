@@ -164,7 +164,9 @@ def calc_heat_rate(data, gen_info, x_name, y_name,
     return slope, intercept, r2, eco_min, gen_sum, heat_input_sum, fig, axs
 
 
-def calc_emis_rate(data, gen_info, x_name, y_name, rate_name):
+def calc_emis_rate(data, gen_info, x_name, y_name, rate_name,
+                   gload_name='GLOAD (MW)', 
+                   heat_input_name='HEAT_INPUT (mmBtu)'):
 
     # Check if all data is NaN
     if data[y_name].isnull().all():
@@ -192,8 +194,8 @@ def calc_emis_rate(data, gen_info, x_name, y_name, rate_name):
     ax.set_ylabel(y_name)
 
     # Calculate total generation and heat input
-    gen_sum = data['GLOAD (MW)'].sum()
-    heat_input_sum = data['HEAT_INPUT (mmBtu)'].sum()
+    gen_sum = data[gload_name].sum()
+    heat_input_sum = data[heat_input_name].sum()
     emis_sum = data[y_name].sum()
 
     # Add text to the top left of the plot

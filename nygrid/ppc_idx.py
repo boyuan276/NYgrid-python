@@ -8,9 +8,9 @@ from pypower.idx_brch import (F_BUS, T_BUS, BR_R, BR_X, BR_B,
 from pypower.idx_cost import MODEL, STARTUP, SHUTDOWN, NCOST, POLYNOMIAL, COST
 
 # Define index for generator commitment keys
-CMT_KEY = 24
-MIN_UP_TIME = 25
-MIN_DOWN_TIME = 26
+CMT_KEY = 25
+MIN_UP_TIME = 26
+MIN_DOWN_TIME = 27
 OFFLINE = -1
 AVAILABLE = 1
 MUSTRUN = 2

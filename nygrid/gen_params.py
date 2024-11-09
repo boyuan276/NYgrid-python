@@ -17,8 +17,35 @@ HEAT_RATE_RANGE = {
 HEAT_RATE_DEFAULT = {
     "CC": {"NG": 7.633},
     "CT": {"NG": 11.098, "FO2": 13.315, "KER": 13.315},
-    "IC": {"NG": 8.899, "FO2": 10.325, "MTE": 8.899},
     "ST": {"NG": 10.347, "FO6": 10.236, "BIT": 10.002}
+}
+
+MIN_UP_TIME = {
+    "CC": {"NG": 6},
+    "CT": {"NG": 2, "FO2": 2, "KER": 2},
+    "ST": {"NG": 7, "FO6": 8, "BIT": 12},
+    "NU": {"UR": 168}, # Nuclear
+    "HY": {"WAT": 0}, # Hydro
+    "Import": {"Import": 0},
+    "WT": {"WND": 0}, # Wind
+    "PV": {"SUN": 0}, # Solar
+    "PS": {"WAT": 0}, # Pumped storage
+    "ES": {"BAT": 0}, # Battery
+    "Other": {"Other": 0} # Other renewable
+}
+
+MIN_DOWN_TIME = {
+    "CC": {"NG": 4},
+    "CT": {"NG": 2, "FO2": 2, "KER": 2},
+    "ST": {"NG": 5, "FO6": 7, "BIT": 12},
+    "NU": {"UR": 168}, # Nuclear
+    "HY": {"WAT": 0}, # Hydro
+    "Import": {"Import": 0},
+    "WT": {"WND": 0}, # Wind
+    "PV": {"SUN": 0}, # Solar
+    "PS": {"WAT": 0}, # Pumped storage
+    "ES": {"BAT": 0}, # Battery
+    "Other": {"Other": 0} # Other renewable
 }
 
 
@@ -49,7 +76,6 @@ def calc_heat_rate(data, gen_info, x_name, y_name,
     X = data_filtered[x_name].values.reshape(-1, 1)
     y = data_filtered[y_name].values
 
-    
     # Method 1: sklearn LinearRegression
     reg = LinearRegression().fit(X, y)
     slope = reg.coef_[0]
@@ -86,26 +112,30 @@ def calc_heat_rate(data, gen_info, x_name, y_name,
 
     # Bad fit if slope is non-positive or R^2 is negative
     if slope <= 0 or r2 < 0:
-        warn(f'Bad fit for {gen_info["NYISO_Name"]} {x_name} {y_name}', UserWarning)
-        
+        warn(
+            f'Bad fit for {gen_info["NYISO_Name"]} {x_name} {y_name}', UserWarning)
+
         # Use default heat rate
-        slope = HEAT_RATE_DEFAULT[gen_info["Unit Type"]][gen_info["Fuel Type Primary"]]
+        slope = HEAT_RATE_DEFAULT[gen_info["Unit Type"]
+                                  ][gen_info["Fuel Type Primary"]]
         intercept = 0
         r2 = 0
         y_pred = slope * X.squeeze()
 
     # Bad fit if slope is outside the range
     if keep_in_range and \
-        slope < HEAT_RATE_RANGE[gen_info["Unit Type"]][gen_info["Fuel Type Primary"]][0] or \
-        slope > HEAT_RATE_RANGE[gen_info["Unit Type"]][gen_info["Fuel Type Primary"]][1]:
-        warn(f'Heat rate {slope:.2f} outside the range for {gen_info["NYISO_Name"]}', UserWarning)
+            slope < HEAT_RATE_RANGE[gen_info["Unit Type"]][gen_info["Fuel Type Primary"]][0] or \
+            slope > HEAT_RATE_RANGE[gen_info["Unit Type"]][gen_info["Fuel Type Primary"]][1]:
+        warn(
+            f'Heat rate {slope:.2f} outside the range for {gen_info["NYISO_Name"]}', UserWarning)
 
         # Use default heat rate
-        slope = HEAT_RATE_DEFAULT[gen_info["Unit Type"]][gen_info["Fuel Type Primary"]]
+        slope = HEAT_RATE_DEFAULT[gen_info["Unit Type"]
+                                  ][gen_info["Fuel Type Primary"]]
         intercept = 0
         r2 = 0
         y_pred = slope * X.squeeze()
-    
+
     # Plot the data
     fig, axs = plt.subplots(2, 1, figsize=(8, 6),
                             gridspec_kw={'height_ratios': [3, 1]},
@@ -165,7 +195,7 @@ def calc_heat_rate(data, gen_info, x_name, y_name,
 
 
 def calc_emis_rate(data, gen_info, x_name, y_name, rate_name,
-                   gload_name='GLOAD (MW)', 
+                   gload_name='GLOAD (MW)',
                    heat_input_name='HEAT_INPUT (mmBtu)'):
 
     # Check if all data is NaN
@@ -281,3 +311,76 @@ def calc_eco_min_ratio(heat_rate, unit_type):
         raise ValueError('Unit type not recognized')
 
     return eco_min
+
+
+def format_gen_prop_thermal(gen_params):
+    gen_prop = pd.DataFrame(index=gen_params.index)
+    gen_prop['GEN_NAME'] = gen_params['NYISO_Name'] + \
+        gen_params['ID']
+    gen_prop['GEN_BUS'] = gen_params['gen_bus']
+    gen_prop['PG'] = 0
+    gen_prop['QG'] = 0
+    gen_prop['QMAX'] = 9999
+    gen_prop['QMIN'] = -9999
+    gen_prop['VG'] = 1
+    gen_prop['MBASE'] = 100
+    gen_prop['GEN_STATUS'] = 1
+    gen_prop['PMAX'] = gen_params['max_gen']
+    gen_prop['PMIN'] = gen_params['eco_min']
+    gen_prop['PC1'] = 0
+    gen_prop['PC2'] = 0
+    gen_prop['QC1MIN'] = 0
+    gen_prop['QC1MAX'] = 0
+    gen_prop['QC2MIN'] = 0
+    gen_prop['QC2MAX'] = 0
+    gen_prop['RAMP_AGC'] = gen_params['max_ramp_hourly']/60
+    gen_prop['RAMP_10'] = gen_params['max_ramp_hourly']/6
+    gen_prop['RAMP_30'] = gen_params['max_ramp_hourly']/2
+    gen_prop['RAMP_Q'] = 0
+    gen_prop['APF'] = 0
+    gen_prop['GEN_ZONE'] = gen_params['Zone']
+    gen_prop['UNIT_TYPE'] = gen_params['Unit_Type']
+    gen_prop['FUEL_TYPE'] = gen_params['Fuel_Type_Primary']
+    gen_prop['CMT_KEY'] = 1  # 1: AVAILABLE, 2: MUSTRUN, -1: OFFLINE
+    gen_prop['MIN_UP_TIME'] = gen_params.apply(
+        lambda row: MIN_UP_TIME[row['Unit_Type']][row['Fuel_Type_Primary']], axis=1)
+    gen_prop['MIN_DOWN_TIME'] = gen_params.apply(
+        lambda row: MIN_DOWN_TIME[row['Unit_Type']][row['Fuel_Type_Primary']], axis=1)
+
+    return gen_prop
+
+
+def format_gen_prop_non_thermal(gen_params):
+    gen_prop = pd.DataFrame(index=gen_params.index)
+    gen_prop['GEN_NAME'] = gen_params['Name']
+    gen_prop['GEN_BUS'] = gen_params['gen_bus']
+    gen_prop['PG'] = 0
+    gen_prop['QG'] = 0
+    gen_prop['QMAX'] = 9999
+    gen_prop['QMIN'] = -9999
+    gen_prop['VG'] = 1
+    gen_prop['MBASE'] = 100
+    gen_prop['GEN_STATUS'] = 1
+    gen_prop['PMAX'] = gen_params['Capacity (MW)']
+    gen_prop['PMIN'] = gen_params['min_gen']
+    gen_prop['PC1'] = 0
+    gen_prop['PC2'] = 0
+    gen_prop['QC1MIN'] = 0
+    gen_prop['QC1MAX'] = 0
+    gen_prop['QC2MIN'] = 0
+    gen_prop['QC2MAX'] = 0
+    gen_prop['RAMP_AGC'] = gen_params['max_ramp_hourly']/60
+    gen_prop['RAMP_10'] = gen_params['max_ramp_hourly']/6
+    gen_prop['RAMP_30'] = gen_params['max_ramp_hourly']/2
+    gen_prop['RAMP_Q'] = 0
+    gen_prop['APF'] = 0
+    gen_prop['GEN_ZONE'] = gen_params['Zone']
+    gen_prop['UNIT_TYPE'] = gen_params['Unit Type']
+    gen_prop['FUEL_TYPE'] = gen_params['Fuel Type Primary']
+    gen_prop['CMT_KEY'] = 2  # 1: AVAILABLE, 2: MUSTRUN, -1: OFFLINE
+    gen_prop['MIN_UP_TIME'] = gen_params.apply(
+        lambda row: MIN_UP_TIME[row['Unit Type']][row['Fuel Type Primary']], axis=1)
+    gen_prop['MIN_DOWN_TIME'] = gen_params.apply(
+        lambda row: MIN_DOWN_TIME[row['Unit Type']][row['Fuel Type Primary']], axis=1)
+    
+    return gen_prop

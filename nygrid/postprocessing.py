@@ -51,7 +51,7 @@ def get_pg_by_fuel(results: dict,
         pg_vre.columns = nygrid_sim.grid_prop['vre_prop']['VRE_NAME']
 
     # Get power output by fuel type
-    fuel_list_non_cvt = nygrid_sim.grid_prop['gen_prop']['GEN_FUEL']
+    fuel_list_non_cvt = nygrid_sim.grid_prop['gen_fuel']['GEN_FUEL']
 
     # For non-converted units
     fuel_types = fuel_list_non_cvt.unique()
@@ -98,7 +98,7 @@ def get_pg_by_fuel_from_list(results_list: List[Dict],
 
 
 def thermal_pg_2_heat_input(thermal_pg: pd.DataFrame,
-                            gen_info: pd.DataFrame
+                            thermal_params: pd.DataFrame
                             ) -> pd.DataFrame:
 
     heat_input = thermal_pg.copy()
@@ -106,8 +106,8 @@ def thermal_pg_2_heat_input(thermal_pg: pd.DataFrame,
     # Loop through all thermal generators
     for gen_name in thermal_pg.columns:
         # Get heat rate linear model
-        heat_rate_lm = gen_info[gen_info.NYISOName == gen_name][[
-            'HeatRateLM_1', 'HeatRateLM_0']].to_numpy().flatten()
+        heat_rate_lm = thermal_params[thermal_params['GEN_NAME'] == gen_name][[
+            'heat_1', 'heat_0']].to_numpy().flatten()
 
         # Get heat input
         heat_input[gen_name] = heat_rate_lm[0] * \

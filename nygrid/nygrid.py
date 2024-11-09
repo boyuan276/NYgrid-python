@@ -351,7 +351,7 @@ class NYGrid:
                            .drop(columns=['BUS_ZONE']).to_numpy())
         self.ppc['gen'] = (self.grid_prop['gen_prop']
                            .drop(columns=['GEN_NAME', 'GEN_ZONE', 
-                                          'GEN_FUEL', 'CMT_KEY',
+                                          'UNIT_TYPE', 'FUEL_TYPE', 'CMT_KEY',
                                           'MIN_UP_TIME', 'MIN_DOWN_TIME']).to_numpy())
         self.ppc['genfuel'] = (self.grid_prop['gen_fuel']
                                .drop(columns=['GEN_NAME']).to_numpy())

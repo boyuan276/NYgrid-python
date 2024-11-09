@@ -143,19 +143,19 @@ def read_grid_profile(data_dir: Union[str, os.PathLike],
         'Bus', '').astype(int)
 
     # Read generation profile
-    gen_profile = pd.read_csv(os.path.join(data_dir, f'gen_profile_{year}.csv'),
-                              parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+    # gen_profile = pd.read_csv(os.path.join(data_dir, f'gen_profile_{year}.csv'),
+    #                           parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
 
     # Read generator capacity limit profile
     genmax_profile = pd.read_csv(os.path.join(data_dir, f'genmax_profile_{year}.csv'),
                                  parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
 
-    genmin_profile = pd.read_csv(os.path.join(data_dir, f'genmin_profile_{year}.csv'),
-                                 parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+    # genmin_profile = pd.read_csv(os.path.join(data_dir, f'genmin_profile_{year}.csv'),
+    #                              parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
 
     # Read generator ramp rate profile
-    genramp30_profile = pd.read_csv(os.path.join(data_dir, f'genramp30_profile_{year}.csv'),
-                                    parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+    # genramp30_profile = pd.read_csv(os.path.join(data_dir, f'genramp30_profile_{year}.csv'),
+    #                                 parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
 
     # Read generator cost profile (linear)
     gencost0_profile = pd.read_csv(os.path.join(data_dir, f'gencost0_profile_{year}.csv'),
@@ -167,25 +167,25 @@ def read_grid_profile(data_dir: Union[str, os.PathLike],
     gencost_startup_profile = pd.read_csv(os.path.join(data_dir, f'gencost_startup_profile_{year}.csv'),
                                           parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
 
-    gencost_shutdown_profile = pd.read_csv(os.path.join(data_dir, f'gencost_shutdown_profile_{year}.csv'),
-                                           parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+    # gencost_shutdown_profile = pd.read_csv(os.path.join(data_dir, f'gencost_shutdown_profile_{year}.csv'),
+    #                                        parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
 
     # Set negative cost to zero
     gencost0_profile[gencost0_profile < 0] = 0
     gencost1_profile[gencost1_profile < 0] = 0
     gencost_startup_profile[gencost_startup_profile < 0] = 0
-    gencost_shutdown_profile[gencost_shutdown_profile < 0] = 0
+    # gencost_shutdown_profile[gencost_shutdown_profile < 0] = 0
 
     grid_profile = {
         'load_profile': load_profile,
-        'gen_profile': gen_profile,
+        # 'gen_profile': gen_profile,
         'genmax_profile': genmax_profile,
-        'genmin_profile': genmin_profile,
-        'genramp30_profile': genramp30_profile,
+        # 'genmin_profile': genmin_profile,
+        # 'genramp30_profile': genramp30_profile,
         'gencost0_profile': gencost0_profile,
         'gencost1_profile': gencost1_profile,
         'gencost_startup_profile': gencost_startup_profile,
-        'gencost_shutdown_profile': gencost_shutdown_profile
+        # 'gencost_shutdown_profile': gencost_shutdown_profile
     }
 
     return grid_profile
@@ -582,16 +582,16 @@ def run_nygrid_sim(grid_prop: Dict[str, pd.DataFrame],
 
     # Set load and generation time series data
     nygrid_sim.set_load_sch(grid_profile['load_profile'])
-    nygrid_sim.set_gen_mw_sch(grid_profile['gen_profile'])
+    # nygrid_sim.set_gen_mw_sch(grid_profile['gen_profile'])
     nygrid_sim.set_gen_max_sch(grid_profile['genmax_profile'])
-    nygrid_sim.set_gen_min_sch(grid_profile['genmin_profile'])
-    nygrid_sim.set_gen_ramp_sch(grid_profile['genramp30_profile'])
+    # nygrid_sim.set_gen_min_sch(grid_profile['genmin_profile'])
+    # nygrid_sim.set_gen_ramp_sch(grid_profile['genramp30_profile'])
     nygrid_sim.set_gen_cost_sch(grid_profile['gencost0_profile'],
                                 grid_profile['gencost1_profile'])
     nygrid_sim.set_gen_cost_startup_sch(
         grid_profile['gencost_startup_profile'])
-    nygrid_sim.set_gen_cost_shutdown_sch(
-        grid_profile['gencost_shutdown_profile'])
+    # nygrid_sim.set_gen_cost_shutdown_sch(
+        # grid_profile['gencost_shutdown_profile'])
 
     if 'genmax_profile_vre' in grid_profile:
         nygrid_sim.set_vre_max_sch(grid_profile['genmax_profile_vre'])

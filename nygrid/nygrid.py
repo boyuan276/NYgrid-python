@@ -115,9 +115,9 @@ def convert_dcline_2_gen(ppc: Dict[str, np.ndarray],
     dcline_gen[:, PMIN] = np.concatenate([dcline[:, DC_PMIN],
                                           dcline[:, DC_PMIN]])
     # Unlimited ramp rate
-    dcline_gen[:, RAMP_AGC] = np.ones(num_dcline * 2) * 1e6
-    dcline_gen[:, RAMP_10] = np.ones(num_dcline * 2) * 1e6
-    dcline_gen[:, RAMP_30] = np.ones(num_dcline * 2) * 1e6
+    dcline_gen[:, RAMP_AGC] = dcline_gen[:, PMAX]/60
+    dcline_gen[:, RAMP_10] = dcline_gen[:, PMAX]/6
+    dcline_gen[:, RAMP_30] = dcline_gen[:, PMAX]/2
 
     # Add the DC line converted generators to the gen matrix
     ppc_dc['gen'] = np.concatenate([ppc['gen'], dcline_gen])
@@ -190,9 +190,9 @@ def convert_esr_2_gen(ppc: Dict[str, np.ndarray],
     esr_gen[:, GEN_STATUS] = np.ones(num_esr)
     esr_gen[:, PMAX] = np.array(esr_prop[:, ESR_DIS_MAX])
     esr_gen[:, PMIN] = np.array(-1 * esr_prop[:, ESR_CRG_MAX])
-    esr_gen[:, RAMP_AGC] = np.ones(num_esr) * 1e6  # Unlimited ramp rate
-    esr_gen[:, RAMP_10] = np.ones(num_esr) * 1e6  # Unlimited ramp rate
-    esr_gen[:, RAMP_30] = np.ones(num_esr) * 1e6  # Unlimited ramp rate
+    esr_gen[:, RAMP_AGC] = esr_gen[:, PMAX]/60
+    esr_gen[:, RAMP_10] = esr_gen[:, PMAX]/6
+    esr_gen[:, RAMP_30] = esr_gen[:, PMAX]/2
     # Add the ESR converted generators to the gen matrix
     ppc_esr['gen'] = np.concatenate([ppc['gen'], esr_gen])
 
@@ -260,9 +260,9 @@ def convert_vre_2_gen(ppc: Dict[str, np.ndarray],
     vre_gen[:, GEN_STATUS] = np.ones(num_vre)
     vre_gen[:, PMAX] = np.array(vre_prop[:, VRE_PMAX])
     vre_gen[:, PMIN] = np.array(vre_prop[:, VRE_PMIN])
-    vre_gen[:, RAMP_AGC] = np.ones(num_vre) * 1e6  # Unlimited ramp rate
-    vre_gen[:, RAMP_10] = np.ones(num_vre) * 1e6  # Unlimited ramp rate
-    vre_gen[:, RAMP_30] = np.ones(num_vre) * 1e6  # Unlimited ramp rate
+    vre_gen[:, RAMP_AGC] = vre_gen[:, PMAX]/60
+    vre_gen[:, RAMP_10] = vre_gen[:, PMAX]/6
+    vre_gen[:, RAMP_30] = vre_gen[:, PMAX]/2
     # Add the ESR converted generators to the gen matrix
     ppc_vre['gen'] = np.concatenate([ppc['gen'], vre_gen])
 

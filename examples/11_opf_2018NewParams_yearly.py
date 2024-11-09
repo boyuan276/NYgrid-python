@@ -78,15 +78,22 @@ if __name__ == '__main__':
     # %% Modify grid data
 
     # Decrease external load by 50%
-    bus_idx_ext = grid_prop['bus_prop'][grid_prop['bus_prop']['BUS_ZONE'].isin(['NE','PJM','IESO'])]['BUS_I']
-    load_profile_new = grid_profile['load_profile'].copy()
-    load_profile_new.loc[:, bus_idx_ext] = load_profile_new.loc[:, bus_idx_ext] * 0.5
-    grid_profile['load_profile'] = load_profile_new
+    # bus_idx_ext = grid_prop['bus_prop'][grid_prop['bus_prop']['BUS_ZONE'].isin(['NE','PJM','IESO'])]['BUS_I']
+    # load_profile_new = grid_profile['load_profile'].copy()
+    # load_profile_new.loc[:, bus_idx_ext] = load_profile_new.loc[:, bus_idx_ext] * 0.2
+    # grid_profile['load_profile'] = load_profile_new
+
+    # Decrease external generation cost by 50%
+    change_index = grid_prop["gen_fuel"]["GEN_FUEL"].isin(
+        ["Import_Import"]).to_numpy()
+
+    gencost1_profile_new = grid_profile['gencost1_profile'].copy()
+    gencost1_profile_new.loc[:, change_index] = gencost1_profile_new.loc[:, change_index] * 0.1
+    grid_profile['gencost1_profile'] = gencost1_profile_new
 
     # Increase FO2, KER and BIT generation costs
     change_index = grid_prop["gen_fuel"]["GEN_FUEL"].isin(
-        ["CT_FO2", "CT_KER", "ST_BIT"]
-    ).to_numpy()
+        ["CT_FO2", "CT_KER", "ST_BIT"]).to_numpy()
 
     gencost0_profile_new = grid_profile['gencost0_profile'].copy()
     gencost0_profile_new.loc[:, change_index] = gencost0_profile_new.loc[:, change_index] * 3
@@ -113,7 +120,7 @@ if __name__ == '__main__':
 
     # No initial condition for the first day
     last_gen = None
-    last_gen_cmt = None
+    last_gen_cmt = np.zeros(sum(grid_prop['gen_prop']['CMT_KEY'] == 1))
     last_soc = None
 
     # Run for the entire year

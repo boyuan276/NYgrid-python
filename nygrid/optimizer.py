@@ -36,8 +36,10 @@ class Optimizer:
         self.branches = range(self.nygrid.NBR)
         # Set of total generators
         self.generators = range(self.nygrid.NG)
-        # Set of generators that need to be committed (All - offline - mustrun)
+        # Set of generators that need to be committed (All = avail + mustrun + offline)
         self.generators_avail = range(self.nygrid.NG_avail)
+        self.generators_mustrun = range(self.nygrid.NG_mustrun)
+        self.generators_offline = range(self.nygrid.NG_offline)
         self.loads = range(self.nygrid.NL)
         self.interfaces = range(self.nygrid.NIF)
         self.dclines = range(self.nygrid.NDCL)
@@ -344,19 +346,20 @@ class Optimizer:
         None
         """
 
+        # Constraints 1.1 and 1.2 are replaced by constraints 1.1 and 1.2 in UC module
         # 1.1. Generator real power output upper limit
-        def gen_power_max_rule(model, t, g):
-            return model.PG[t, g] <= self.nygrid.gen_max[t, g]
+        # def gen_power_max_rule(model, t, g):
+        #     return model.PG[t, g] <= self.nygrid.gen_max[t, g]
 
-        self.model.c_gen_max = pyo.Constraint(self.times, self.generators,
-                                              rule=gen_power_max_rule)
+        # self.model.c_gen_max = pyo.Constraint(self.times, self.generators,
+        #                                       rule=gen_power_max_rule)
 
         # 1.2. Generator real power output lower limit
-        def gen_power_min_rule(model, t, g):
-            return - model.PG[t, g] <= - self.nygrid.gen_min[t, g]
+        # def gen_power_min_rule(model, t, g):
+        #     return - model.PG[t, g] <= - self.nygrid.gen_min[t, g]
 
-        self.model.c_gen_min = pyo.Constraint(self.times, self.generators,
-                                              rule=gen_power_min_rule)
+        # self.model.c_gen_min = pyo.Constraint(self.times, self.generators,
+        #                                       rule=gen_power_min_rule)
 
         # 2.1. Generator ramp rate downward limit
         def gen_ramp_rate_down_rule(model, t, g):
@@ -415,24 +418,41 @@ class Optimizer:
         """
 
         # 1.1. Generator real power output upper limit with commitment status
-        def gen_power_max_cmt_rule(model, t, ga):
+        # Available generators for unit commitment
+        def gen_power_max_avail_rule(model, t, ga):
             g = self.nygrid.gen_idx_avail[ga]
             return model.PG[t, g] <= self.nygrid.gen_max[t, g] * model.u[t, ga]
         
-        self.model.c_gen_max_cmt = pyo.Constraint(self.times, self.generators_avail,
-                                                rule=gen_power_max_cmt_rule)
+        self.model.c_gen_max_avail = pyo.Constraint(self.times, self.generators_avail,
+                                                rule=gen_power_max_avail_rule)
+        
+        # Must-run generators
+        def gen_power_max_mustrun_rule(model, t, ga):
+            g = self.nygrid.gen_idx_mustrun[ga]
+            return model.PG[t, g] <= self.nygrid.gen_max[t, g]
+
+        self.model.c_gen_max_mustrun = pyo.Constraint(self.times, self.generators_mustrun,
+                                              rule=gen_power_max_mustrun_rule)
         
         # 1.2. Generator real power output lower limit with commitment status
-        def gen_power_min_cmt_rule(model, t, ga):
+        # Available generators for unit commitment
+        def gen_power_min_avail_rule(model, t, ga):
             g = self.nygrid.gen_idx_avail[ga]
             return model.PG[t, g] >= self.nygrid.gen_min[t, g] * model.u[t, ga]
         
-        self.model.c_gen_min_cmt = pyo.Constraint(self.times, self.generators_avail,
-                                                rule=gen_power_min_cmt_rule)
+        self.model.c_gen_min_avail = pyo.Constraint(self.times, self.generators_avail,
+                                                rule=gen_power_min_avail_rule)
+        
+        # Must-run generators
+        def gen_power_min_mustrun_rule(model, t, ga):
+            g = self.nygrid.gen_idx_mustrun[ga]
+            return - model.PG[t, g] <= - self.nygrid.gen_min[t, g]
+
+        self.model.c_gen_min_mustrun = pyo.Constraint(self.times, self.generators_mustrun,
+                                              rule=gen_power_min_mustrun_rule)
         
         # 2.1. Generator commitment status
         def gen_commit_rule(model, t, ga):
-            g = self.nygrid.gen_idx_avail[ga]
             if t == 0:
                 if self.nygrid.gen_init_cmt is not None:
                     return model.u[t, ga] == self.nygrid.gen_init_cmt[ga] \

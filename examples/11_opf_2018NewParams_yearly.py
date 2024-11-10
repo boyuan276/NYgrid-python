@@ -23,7 +23,9 @@ if __name__ == '__main__':
 
     # %% Simulation settings
     # NOTE: Change the following settings to run the simulation
-    sim_name = '2018NewParams'
+    sim_name = '2018NewParams_ext0.5'
+    ext_cost_factor = 0.5
+    
     leading_hours = 12
     
     start_date = datetime(2018, 1, 1, 0, 0, 0)
@@ -60,8 +62,7 @@ if __name__ == '__main__':
     logging.info('Results directory: {}'.format(results_dir))
 
     # NOTE: Change sim_results_dir to the directory where simulation results are saved
-    # sim_results_dir = os.path.join(results_dir, sim_name)
-    sim_results_dir = os.path.join(results_dir, '2018NewParams')
+    sim_results_dir = os.path.join(results_dir, sim_name)
     if not os.path.exists(sim_results_dir):
         os.mkdir(sim_results_dir)
         logging.info(
@@ -88,24 +89,24 @@ if __name__ == '__main__':
         ["Import_Import"]).to_numpy()
 
     gencost1_profile_new = grid_profile['gencost1_profile'].copy()
-    gencost1_profile_new.loc[:, change_index] = gencost1_profile_new.loc[:, change_index] * 0.1
+    gencost1_profile_new.loc[:, change_index] = gencost1_profile_new.loc[:, change_index] * ext_cost_factor
     grid_profile['gencost1_profile'] = gencost1_profile_new
 
     # Increase FO2, KER and BIT generation costs
-    change_index = grid_prop["gen_fuel"]["GEN_FUEL"].isin(
-        ["CT_FO2", "CT_KER", "ST_BIT"]).to_numpy()
+    # change_index = grid_prop["gen_fuel"]["GEN_FUEL"].isin(
+    #     ["CT_FO2", "CT_KER", "ST_BIT"]).to_numpy()
 
-    gencost0_profile_new = grid_profile['gencost0_profile'].copy()
-    gencost0_profile_new.loc[:, change_index] = gencost0_profile_new.loc[:, change_index] * 3
-    grid_profile['gencost0_profile'] = gencost0_profile_new
+    # gencost0_profile_new = grid_profile['gencost0_profile'].copy()
+    # gencost0_profile_new.loc[:, change_index] = gencost0_profile_new.loc[:, change_index] * 3
+    # grid_profile['gencost0_profile'] = gencost0_profile_new
 
-    gencost1_profile_new = grid_profile['gencost1_profile'].copy()
-    gencost1_profile_new.loc[:, change_index] = gencost1_profile_new.loc[:, change_index] * 3
-    grid_profile['gencost1_profile'] = gencost1_profile_new
+    # gencost1_profile_new = grid_profile['gencost1_profile'].copy()
+    # gencost1_profile_new.loc[:, change_index] = gencost1_profile_new.loc[:, change_index] * 3
+    # grid_profile['gencost1_profile'] = gencost1_profile_new
 
-    gencost_startup_profile_new = grid_profile['gencost_startup_profile'].copy()
-    gencost_startup_profile_new.loc[:, change_index] = gencost_startup_profile_new.loc[:, change_index] * 3
-    grid_profile['gencost_startup_profile'] = gencost_startup_profile_new
+    # gencost_startup_profile_new = grid_profile['gencost_startup_profile'].copy()
+    # gencost_startup_profile_new.loc[:, change_index] = gencost_startup_profile_new.loc[:, change_index] * 5
+    # grid_profile['gencost_startup_profile'] = gencost_startup_profile_new
 
     # %% Set up OPF model
 

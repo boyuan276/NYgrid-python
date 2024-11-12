@@ -23,8 +23,9 @@ if __name__ == '__main__':
 
     # %% Simulation settings
     # NOTE: Change the following settings to run the simulation
-    sim_name = '2018NewParams_ext0.5'
-    ext_cost_factor = 0.5
+    ext_cost_factor = 0.2
+    fo_cost_factor = 0.5
+    sim_name = f'2018NewParams_ext{ext_cost_factor}_fo{fo_cost_factor}_yearly'
     
     leading_hours = 12
     
@@ -78,35 +79,33 @@ if __name__ == '__main__':
 
     # %% Modify grid data
 
-    # Decrease external load by 50%
-    # bus_idx_ext = grid_prop['bus_prop'][grid_prop['bus_prop']['BUS_ZONE'].isin(['NE','PJM','IESO'])]['BUS_I']
-    # load_profile_new = grid_profile['load_profile'].copy()
-    # load_profile_new.loc[:, bus_idx_ext] = load_profile_new.loc[:, bus_idx_ext] * 0.2
-    # grid_profile['load_profile'] = load_profile_new
-
     # Decrease external generation cost by 50%
     change_index = grid_prop["gen_fuel"]["GEN_FUEL"].isin(
-        ["Import_Import"]).to_numpy()
+        ['PJM','IESO']).to_numpy()
 
     gencost1_profile_new = grid_profile['gencost1_profile'].copy()
-    gencost1_profile_new.loc[:, change_index] = gencost1_profile_new.loc[:, change_index] * ext_cost_factor
+    gencost1_profile_new.loc[:, change_index] = \
+        gencost1_profile_new.loc[:, change_index] * ext_cost_factor
     grid_profile['gencost1_profile'] = gencost1_profile_new
 
-    # Increase FO2, KER and BIT generation costs
-    # change_index = grid_prop["gen_fuel"]["GEN_FUEL"].isin(
-    #     ["CT_FO2", "CT_KER", "ST_BIT"]).to_numpy()
+    # Decrease FO2, KER and FO6 generation costs
+    change_index = grid_prop["gen_fuel"]["GEN_FUEL"].isin(
+        ["CT_FO2", "CT_KER", "ST_FO6"]).to_numpy()
 
-    # gencost0_profile_new = grid_profile['gencost0_profile'].copy()
-    # gencost0_profile_new.loc[:, change_index] = gencost0_profile_new.loc[:, change_index] * 3
-    # grid_profile['gencost0_profile'] = gencost0_profile_new
+    gencost0_profile_new = grid_profile['gencost0_profile'].copy()
+    gencost0_profile_new.loc[:, change_index] = \
+        gencost0_profile_new.loc[:, change_index] * fo_cost_factor
+    grid_profile['gencost0_profile'] = gencost0_profile_new
 
-    # gencost1_profile_new = grid_profile['gencost1_profile'].copy()
-    # gencost1_profile_new.loc[:, change_index] = gencost1_profile_new.loc[:, change_index] * 3
-    # grid_profile['gencost1_profile'] = gencost1_profile_new
+    gencost1_profile_new = grid_profile['gencost1_profile'].copy()
+    gencost1_profile_new.loc[:, change_index] = \
+        gencost1_profile_new.loc[:, change_index] * fo_cost_factor
+    grid_profile['gencost1_profile'] = gencost1_profile_new
 
-    # gencost_startup_profile_new = grid_profile['gencost_startup_profile'].copy()
-    # gencost_startup_profile_new.loc[:, change_index] = gencost_startup_profile_new.loc[:, change_index] * 5
-    # grid_profile['gencost_startup_profile'] = gencost_startup_profile_new
+    gencost_startup_profile_new = grid_profile['gencost_startup_profile'].copy()
+    gencost_startup_profile_new.loc[:, change_index] = \
+        gencost_startup_profile_new.loc[:, change_index] * fo_cost_factor
+    grid_profile['gencost_startup_profile'] = gencost_startup_profile_new
 
     # %% Set up OPF model
 
@@ -117,6 +116,11 @@ if __name__ == '__main__':
         'PenaltyForLoadShed': 20_000,
         # 'PenaltyForBranchMwViolation': 10_000,
         # 'PenaltyForInterfaceMWViolation': 10_000
+    }
+
+    solver_options = {
+        'NodefileStart': 0.5,
+        'NodefileDir': sim_results_dir
     }
 
     # No initial condition for the first day
@@ -136,6 +140,7 @@ if __name__ == '__main__':
                                            start_datetime=start_datetime,
                                            end_datetime=end_datetime,
                                            options=options,
+                                           solver_options=solver_options,
                                            gen_init=last_gen,
                                            gen_init_cmt=last_gen_cmt,
                                            soc_init=last_soc,

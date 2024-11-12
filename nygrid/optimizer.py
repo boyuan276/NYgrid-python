@@ -472,11 +472,44 @@ class Optimizer:
         self.model.c_gen_commitment_2 = pyo.Constraint(self.times, self.generators_avail,
                                                     rule=gen_commit_rule_2)
 
-        # 2.2. Generator minimum down time constraint
+        # 2.2. Generator minimum up time constraint
+        # def gen_min_up_time_rule(model, t, ga):
+        #     g = self.nygrid.gen_idx_avail[ga]
+        #     if t < self.nygrid.min_up_time[g]:
+        #         return pyo.Constraint.Skip
+        #     else:
+        #         startup_count = 0
+        #         for time in range(self.nygrid.min_up_time[g]):
+        #             startup_count += model.v[t - time, ga]
+        #         return startup_count <= model.u[t, ga]
+
+        # self.model.c_gen_min_up_time = pyo.Constraint(self.times, self.generators_avail,
+        #                                                 rule=gen_min_up_time_rule)
+        
+        ####
+        # 2.2. Generator minimum up time constraint
         def gen_min_up_time_rule(model, t, ga):
             g = self.nygrid.gen_idx_avail[ga]
             if t < self.nygrid.min_up_time[g]:
-                return pyo.Constraint.Skip
+                # 1. No last startup
+                if self.nygrid.gen_last_startup_hour is None:
+                    return pyo.Constraint.Skip
+                # 2. Last startup is longer than min up time
+                elif self.nygrid.gen_last_startup_hour[ga] > self.nygrid.min_up_time[g]:
+                    return pyo.Constraint.Skip
+                # 3. Last startup is shorter than min up time
+                else:
+                    past_v = np.zeros(self.nygrid.min_up_time[g])
+                    past_v[-self.nygrid.gen_last_startup_hour[ga]] = 1
+                
+                    startup_count = 0
+                    for time in range(self.nygrid.min_up_time[g]):
+                        if t-time >= 0:
+                            startup_count += model.v[t - time, ga]
+                        else:
+                            startup_count += past_v[t - time]
+                return startup_count <= model.u[t, ga]
+            
             else:
                 startup_count = 0
                 for time in range(self.nygrid.min_up_time[g]):
@@ -485,12 +518,48 @@ class Optimizer:
 
         self.model.c_gen_min_up_time = pyo.Constraint(self.times, self.generators_avail,
                                                         rule=gen_min_up_time_rule)
+        
+        ####
 
-        # 2.3. Generator minimum up time constraint
+        # 2.3. Generator minimum down time constraint
+        # def gen_min_down_time_rule(model, t, ga):
+        #     g = self.nygrid.gen_idx_avail[ga]
+        #     if t < self.nygrid.min_down_time[g]:
+        #         return pyo.Constraint.Skip
+        #     else:
+        #         shutdown_count = 0
+        #         for time in range(self.nygrid.min_down_time[g]):
+        #             shutdown_count += model.w[t - time, ga]
+        #         return shutdown_count <= 1- model.u[t, ga]
+
+        # self.model.c_gen_min_down_time = pyo.Constraint(self.times, self.generators_avail,
+        #                                               rule=gen_min_down_time_rule)
+        
+        ####
+        # 2.3. Generator minimum down time constraint
         def gen_min_down_time_rule(model, t, ga):
             g = self.nygrid.gen_idx_avail[ga]
             if t < self.nygrid.min_down_time[g]:
-                return pyo.Constraint.Skip
+                
+                # 1. No last shutdown
+                if self.nygrid.gen_last_shutdown_hour is None:
+                    return pyo.Constraint.Skip
+                # 2. Last shutdown is longer than min up time
+                elif self.nygrid.gen_last_shutdown_hour[ga] > self.nygrid.min_down_time[g]:
+                    return pyo.Constraint.Skip
+                # 3. Last shutdown is shorter than min up time
+                else:
+                    past_w = np.zeros(self.nygrid.min_down_time[g])
+                    past_w[-self.nygrid.gen_last_shutdown_hour[ga]] = 1
+                
+                    shutdown_count = 0
+                    for time in range(self.nygrid.min_down_time[g]):
+                        if t-time >= 0:
+                            shutdown_count += model.w[t - time, ga]
+                        else:
+                            shutdown_count += past_w[t -time]
+                return shutdown_count <= 1- model.u[t, ga]
+
             else:
                 shutdown_count = 0
                 for time in range(self.nygrid.min_down_time[g]):
@@ -498,7 +567,8 @@ class Optimizer:
                 return shutdown_count <= 1- model.u[t, ga]
 
         self.model.c_gen_min_down_time = pyo.Constraint(self.times, self.generators_avail,
-                                                      rule=gen_min_down_time_rule)   
+                                                      rule=gen_min_down_time_rule)  
+        ####
     
     def add_constrs_pf(self):
         """

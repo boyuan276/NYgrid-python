@@ -536,9 +536,12 @@ def run_nygrid_sim(grid_prop: Dict[str, pd.DataFrame],
                    start_datetime: pd.Timestamp,
                    end_datetime: pd.Timestamp,
                    options: Dict[str, Any],
+                   solver_options: Optional[Dict[str, Any]],
                    gen_init: Optional[np.ndarray],
                    gen_init_cmt: Optional[np.ndarray],
                    soc_init: Optional[np.ndarray],
+                   gen_last_startup_hour: Optional[np.ndarray] = None,
+                   gen_last_shutdown_hour: Optional[np.ndarray] = None,
                    verbose: bool = False
                    ) -> Dict[str, pd.DataFrame]:
     """
@@ -565,6 +568,10 @@ def run_nygrid_sim(grid_prop: Dict[str, pd.DataFrame],
         Initial generator status
     init_soc : np.ndarray
         Initial ESR SOC
+    gen_last_startup_hour : np.ndarray, optional
+        Hour since the last generator startup
+    gen_last_shutdown_hour : np.ndarray, optional
+        Hour since the last generator shutdown
     verbose : bool, optional
         Print verbose output, by default
 
@@ -608,13 +615,78 @@ def run_nygrid_sim(grid_prop: Dict[str, pd.DataFrame],
     # Set ESR initial condition
     nygrid_sim.set_esr_init_data(esr_init=soc_init)
 
+    # Set last startup and shutdown hour
+    nygrid_sim.set_gen_last_startup_data(gen_last_startup_hour)
+    nygrid_sim.set_gen_last_shutdown_data(gen_last_shutdown_hour)
+
     # Set options
     nygrid_sim.set_options(options)
 
     # Solve DC OPF
-    nygrid_sim.solve_dc_opf()
+    nygrid_sim.solve_dc_opf(solver_options)
 
     # Get nygrid_results
     results = nygrid_sim.get_results_dc_opf()
 
     return results
+
+
+def get_last_startup_hour(results: Dict[str, pd.DataFrame],
+                          hour_before_start: pd.Timestamp) -> np.ndarray:
+    """
+    Get the hour since the last generator startup
+
+    Parameters
+    ----------
+    results : dict
+        Dictionary of results
+    hour_before_start : pd.Timestamp
+        Hour before the start of the simulation
+
+    Returns
+    -------
+    hour_since_last_startup : np.ndarray
+        Hour since the last generator startup
+    """
+
+    hour_since_last_startup = np.zeros(results['genStartup'].shape[1], dtype=int)
+    
+    for ii in range(results['genStartup'].shape[1]):
+        startup_record = results['genStartup'][:hour_before_start][ii]
+        if startup_record.sum() > 0:
+            last_startup_hour = startup_record[startup_record > 0].index[-1]
+            hour_since_last_startup[ii] = int((hour_before_start - last_startup_hour).total_seconds()/ 3600)
+        else:
+            hour_since_last_startup[ii] = 999
+    
+    return hour_since_last_startup
+
+def get_last_shutdown_hour(results: Dict[str, pd.DataFrame],
+                           hour_before_start: pd.Timestamp) -> np.ndarray:
+    """
+    Get the hour since the last generator shutdown
+
+    Parameters
+    ----------
+    results : dict
+        Dictionary of results
+    hour_before_start : pd.Timestamp
+        Hour before the start of the simulation
+
+    Returns
+    -------
+    hour_since_last_shutdown : np.ndarray
+        Hour since the last generator shutdown    
+    """
+    
+    hour_since_last_shutdown = np.zeros(results['genShutdown'].shape[1], dtype=int)
+
+    for ii in range(results['genShutdown'].shape[1]):
+        shutdown_record = results['genShutdown'][:hour_before_start][ii]
+        if shutdown_record.sum() > 0:
+            last_shutdown_hour = shutdown_record[shutdown_record > 0].index[-1]
+            hour_since_last_shutdown[ii] = int((hour_before_start - last_shutdown_hour).total_seconds()/3600)
+        else:
+            hour_since_last_shutdown[ii] = 999
+
+    return hour_since_last_shutdown

@@ -536,6 +536,8 @@ class NYGrid:
         # Generator initial condition
         self.gen_init = None
         self.gen_init_cmt = None
+        self.gen_last_startup_hour = None
+        self.gen_last_shutdown_hour = None
 
         # Add ESR properties
         if self.grid_prop['esr_prop'] is not None and self.grid_prop['esr_prop'].size > 0:
@@ -946,6 +948,46 @@ class NYGrid:
             gen_init_cmt = pd.DataFrame(
                 gen_init_cmt, index=self.gen_idx_avail).sort_index().to_numpy().squeeze()
             self.gen_init_cmt = gen_init_cmt
+        else:
+            Warning('No generator initial commitment condition is provided.')
+
+    def set_gen_last_startup_data(self, gen_last_startup_hour: Optional[np.ndarray]) -> None:
+        """
+        Get generator past startup records.
+
+        Parameters
+        ----------
+            gen_past_startup_hour (numpy.ndarray): A 2-d array of generator past
+                unit commitment startup record.
+
+        """
+
+        if gen_last_startup_hour is not None and gen_last_startup_hour.size > 0:
+            # Convert to internal generator indexing
+            gen_last_startup_hour = pd.DataFrame(
+                gen_last_startup_hour, 
+                index=self.gen_idx_avail).sort_index().to_numpy().squeeze()
+            self.gen_last_startup_hour = gen_last_startup_hour
+        else:
+            Warning('No generator last startup hour is provided.')
+
+    def set_gen_last_shutdown_data(self, gen_last_shutdown_hour: Optional[np.ndarray]) -> None:
+        """
+        Get generator past shutdown records.
+
+        Parameters
+        ----------
+            gen_past_shutdown_hour (numpy.ndarray): A 2-d array of generator past
+                unit commitment shutdown record.
+
+        """
+
+        if gen_last_shutdown_hour is not None and gen_last_shutdown_hour.size > 0:
+            # Convert to internal generator indexing
+            gen_last_shutdown_hour = pd.DataFrame(
+                gen_last_shutdown_hour, 
+                index=self.gen_idx_avail).sort_index().to_numpy().squeeze()
+            self.gen_last_shutdown_hour = gen_last_shutdown_hour
         else:
             Warning('No generator initial commitment condition is provided.')
 

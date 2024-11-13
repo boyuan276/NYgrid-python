@@ -27,11 +27,16 @@ if __name__ == '__main__':
     fo_cost_factor = 0.5
     sim_name = f'2018NewParams_ext{ext_cost_factor}_fo{fo_cost_factor}_daily'
 
-    leading_hours = 24
+    # Simulation time settings
+    valid_days = 30
+    lookahead_days = 1
 
-    start_date = datetime(2018, 1, 1, 0, 0, 0)
-    end_date = datetime(2018, 12, 31, 0, 0, 0)
-    timestamp_list = pd.date_range(start_date, end_date, freq='1D')
+    valid_hours = 24 * valid_days - 1
+    lookahead_hours = 24 * lookahead_days
+
+    sim_start_time = datetime(2018, 1, 1, 0, 0, 0)
+    sim_end_time = datetime(2018, 12, 31, 23, 0, 0)
+    timestamp_list = pd.date_range(sim_start_time, sim_end_time, freq=f'{valid_days}D')
     verbose = True
 
     if 'examples' in os.getcwd():
@@ -75,7 +80,7 @@ if __name__ == '__main__':
     grid_prop = ng_run.read_grid_prop(grid_data_dir)
 
     # Read load and generation profiles
-    grid_profile = ng_run.read_grid_profile(grid_data_dir, start_date.year)
+    grid_profile = ng_run.read_grid_profile(grid_data_dir, sim_start_time.year)
 
     # %% Modify grid data
 
@@ -124,7 +129,9 @@ if __name__ == '__main__':
     }
 
     # No initial condition for the first day
-    last_gen = None
+    last_gen = np.zeros(grid_prop['gen_prop'].shape[0]+
+                        grid_prop['esr_prop'].shape[0]+
+                        grid_prop['dcline_prop'].shape[0]*2)
     last_gen_cmt = np.zeros(sum(grid_prop['gen_prop']['CMT_KEY'] == 1))
     last_soc = None
     hour_since_last_startup = None
@@ -134,19 +141,18 @@ if __name__ == '__main__':
     for d in tqdm(range(len(timestamp_list)), desc='Running OPF'):
         t = time.time()
 
-        # Remove leading hours for the last day
-        if d == len(timestamp_list) - 1:
-            leading_hours = 0
+        # Set clycle start and end datetime
+        cycle_start_time = timestamp_list[d]
 
-        # Run OPF for one day (24 hours) plus leading hours
-        # The first day is valid, the leading hours are used to dispatch batteries properly
-        start_datetime = timestamp_list[d]
-        end_datetime = start_datetime + timedelta(hours=23 + leading_hours)
+        if d < len(timestamp_list) - 1:
+            cycle_end_time = cycle_start_time + timedelta(hours=valid_hours + lookahead_hours)
+        else:
+            cycle_end_time = sim_end_time
 
         nygrid_results = ng_run.run_nygrid_sim(grid_prop=grid_prop,
                                                grid_profile=grid_profile,
-                                               start_datetime=start_datetime,
-                                               end_datetime=end_datetime,
+                                               start_datetime=cycle_start_time,
+                                               end_datetime=cycle_end_time,
                                                options=options,
                                                solver_options=solver_options,
                                                gen_init=last_gen,
@@ -157,31 +163,32 @@ if __name__ == '__main__':
                                                verbose=verbose)
 
         # Save simulation nygrid_results to pickle
-        filename = f'nygrid_sim_{sim_name}_{start_datetime.strftime("%Y%m%d")}.pkl'
+        filename = f'nygrid_sim_{sim_name}_{cycle_start_time.strftime("%Y%m%d")}_{valid_days}_{lookahead_days}.pkl'
         with open(os.path.join(sim_results_dir, filename), 'wb') as f:
             pickle.dump(nygrid_results, f)
         logging.info(f'Saved simulation nygrid_results in {filename}')
 
-        # Set initial conditions for the next iteration
-        end_datetime_day1 = start_datetime + timedelta(hours=23)
-        
-        # Set generator initial condition
-        last_gen = nygrid_results['PG'].loc[end_datetime_day1].to_numpy().squeeze()
-        
-        # Set generator commitment initial condition
-        last_gen_cmt = nygrid_results['genCommit'].loc[end_datetime_day1].to_numpy().squeeze()
-        
-        # Set ESR initial condition
-        last_soc = nygrid_results['esrSOC'].loc[end_datetime_day1].to_numpy().squeeze()
+        if d < len(timestamp_list) - 1:
+            # Set initial conditions for the next iteration
+            time_before_next_cycle = cycle_start_time + timedelta(hours=valid_hours)
+            
+            # Set generator initial condition
+            last_gen = nygrid_results['PG'].loc[time_before_next_cycle].to_numpy().squeeze()
+            
+            # Set generator commitment initial condition
+            last_gen_cmt = nygrid_results['genCommit'].loc[time_before_next_cycle].to_numpy().squeeze()
+            
+            # Set ESR initial condition
+            last_soc = nygrid_results['esrSOC'].loc[time_before_next_cycle].to_numpy().squeeze()
 
-        # Calculate hours since last startup and shutdown
-        hour_since_last_startup = ng_run.get_last_startup_hour(nygrid_results,
-                                                                end_datetime_day1)
-        hour_since_last_shutdown = ng_run.get_last_shutdown_hour(nygrid_results,
-                                                                 end_datetime_day1)
+            # Calculate hours since last startup and shutdown
+            hour_since_last_startup = ng_run.get_last_startup_hour(nygrid_results,
+                                                                    time_before_next_cycle)
+            hour_since_last_shutdown = ng_run.get_last_shutdown_hour(nygrid_results,
+                                                                    time_before_next_cycle)
         
         elapsed = time.time() - t
-        logging.info(f'Finished running for {start_datetime.strftime("%Y-%m-%d")}.')
+        logging.info(f'Finished running for {cycle_start_time.strftime("%Y-%m-%d")}.')
         logging.info(f'Elapsed time: {elapsed:.2f} seconds')
         logging.info('-' * 80)
 

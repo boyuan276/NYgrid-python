@@ -9,6 +9,7 @@ import os
 
 import numpy as np
 import pandas as pd
+from datetime import datetime, timedelta
 import pyomo.environ as pyo
 import pypower.api as pp
 from pyomo.opt import SolverStatus, TerminationCondition
@@ -323,11 +324,19 @@ class NYGrid:
             self.start_datetime = start_datetime
         elif isinstance(start_datetime, str):
             self.start_datetime = ng_utils.format_date(start_datetime)
+        elif isinstance(start_datetime, datetime):
+            self.start_datetime = pd.Timestamp(start_datetime)
+        else:
+            raise ValueError('start_datetime must be a string or pandas.Timestamp.')
 
         if isinstance(end_datetime, pd.Timestamp):
             self.end_datetime = end_datetime
         elif isinstance(end_datetime, str):
             self.end_datetime = ng_utils.format_date(end_datetime)
+        elif isinstance(end_datetime, datetime):
+            self.end_datetime = pd.Timestamp(end_datetime)
+        else:
+            raise ValueError('end_datetime must be a string or pandas.Timestamp.')
 
         self.delta_t = self.end_datetime - self.start_datetime
         self.timestamp_list = pd.date_range(

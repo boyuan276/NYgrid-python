@@ -101,6 +101,14 @@ class Optimizer:
         # Binary shutdown states [1 if generator has a shutdown, 0 otherwise]
         self.model.w = pyo.Var(self.times, self.generators_avail,
                                  within=pyo.Binary, initialize=0)
+        
+        # Slack variable for minimum up time constraint
+        self.model.s_min_up_time = pyo.Var(self.times, self.generators_avail,
+                                           within=pyo.NonNegativeIntegers, initialize=0)
+        
+        # Slack variable for minimum down time constraint
+        self.model.s_min_down_time = pyo.Var(self.times, self.generators_avail,
+                                             within=pyo.NonNegativeIntegers, initialize=0)
 
     def add_vars_pf(self):
         """
@@ -311,6 +319,18 @@ class Optimizer:
             return sum(model.s_esr_soc_undert[t, esr]
                        for esr in self.esrs for t in self.times) * \
                         self.nygrid.PenaltyForESRSOCTargetViolation
+        
+        # Penalty for violating minimum up time constraint
+        def gen_min_up_time_penalty_expr(model):
+            return sum(model.s_min_up_time[t, ga]
+                       for ga in self.generators_avail for t in self.times) * \
+                        self.nygrid.PenaltyForMinTimeViolation
+        
+        # Penalty for violating minimum down time constraint
+        def gen_min_down_time_penalty_expr(model):
+            return sum(model.s_min_down_time[t, ga]
+                       for ga in self.generators_avail for t in self.times) * \
+                        self.nygrid.PenaltyForMinTimeViolation
 
         # Objective function
         self.model.obj = pyo.Objective(expr=(
@@ -333,6 +353,8 @@ class Optimizer:
             + esr_soc_min_penalty_expr(self.model)
             + esr_soc_overt_penalty_expr(self.model)
             + esr_soc_undert_penalty_expr(self.model)
+            + gen_min_up_time_penalty_expr(self.model)
+            + gen_min_down_time_penalty_expr(self.model)
         ), sense=pyo.minimize)
 
         logging.debug('Added objective function.')
@@ -471,22 +493,7 @@ class Optimizer:
         
         self.model.c_gen_commitment_2 = pyo.Constraint(self.times, self.generators_avail,
                                                     rule=gen_commit_rule_2)
-
-        # 2.2. Generator minimum up time constraint
-        # def gen_min_up_time_rule(model, t, ga):
-        #     g = self.nygrid.gen_idx_avail[ga]
-        #     if t < self.nygrid.min_up_time[g]:
-        #         return pyo.Constraint.Skip
-        #     else:
-        #         startup_count = 0
-        #         for time in range(self.nygrid.min_up_time[g]):
-        #             startup_count += model.v[t - time, ga]
-        #         return startup_count <= model.u[t, ga]
-
-        # self.model.c_gen_min_up_time = pyo.Constraint(self.times, self.generators_avail,
-        #                                                 rule=gen_min_up_time_rule)
         
-        ####
         # 2.2. Generator minimum up time constraint
         def gen_min_up_time_rule(model, t, ga):
             g = self.nygrid.gen_idx_avail[ga]
@@ -514,28 +521,11 @@ class Optimizer:
                 startup_count = 0
                 for time in range(self.nygrid.min_up_time[g]):
                     startup_count += model.v[t - time, ga]
-                return startup_count <= model.u[t, ga]
+                return startup_count <= model.u[t, ga] + model.s_min_up_time[t, ga]
 
         self.model.c_gen_min_up_time = pyo.Constraint(self.times, self.generators_avail,
                                                         rule=gen_min_up_time_rule)
         
-        ####
-
-        # 2.3. Generator minimum down time constraint
-        # def gen_min_down_time_rule(model, t, ga):
-        #     g = self.nygrid.gen_idx_avail[ga]
-        #     if t < self.nygrid.min_down_time[g]:
-        #         return pyo.Constraint.Skip
-        #     else:
-        #         shutdown_count = 0
-        #         for time in range(self.nygrid.min_down_time[g]):
-        #             shutdown_count += model.w[t - time, ga]
-        #         return shutdown_count <= 1- model.u[t, ga]
-
-        # self.model.c_gen_min_down_time = pyo.Constraint(self.times, self.generators_avail,
-        #                                               rule=gen_min_down_time_rule)
-        
-        ####
         # 2.3. Generator minimum down time constraint
         def gen_min_down_time_rule(model, t, ga):
             g = self.nygrid.gen_idx_avail[ga]
@@ -558,7 +548,7 @@ class Optimizer:
                             shutdown_count += model.w[t - time, ga]
                         else:
                             shutdown_count += past_w[t -time]
-                return shutdown_count <= 1- model.u[t, ga]
+                return shutdown_count <= 1- model.u[t, ga] + model.s_min_down_time[t, ga]
 
             else:
                 shutdown_count = 0

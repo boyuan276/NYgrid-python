@@ -593,7 +593,7 @@ class NYGrid:
         self.PenaltyForLoadShed = 5_000  # $/MWh
         self.PenaltyForRampViolation = 11_000  # $/MW
         # UC module
-        self.PenaltyForMinTimeViolation = 1_000  # $/MWh, Not used
+        self.PenaltyForMinTimeViolation = 1_000  # $/MWh
         self.PenaltyForNumberCommitViolation = 10_000  # $/hour, Not used
         # RS module
         self.NoReserveViolation = False
@@ -1244,6 +1244,10 @@ class NYGrid:
                             .reshape(self.NT, self.NBR) * self.baseMVA)
         results_s_br_min = (np.array(self.model.s_br_min[:, :]())
                             .reshape(self.NT, self.NBR) * self.baseMVA)
+        results_s_min_up_time = (np.array(self.model.s_min_up_time[:, :]())
+                                 .reshape(self.NT, self.NG_avail))
+        results_s_min_down_time = (np.array(self.model.s_min_down_time[:, :]())
+                                   .reshape(self.NT, self.NG_avail))
 
         slack_vars = {
             's_ramp_up': results_s_ramp_up,
@@ -1253,7 +1257,9 @@ class NYGrid:
             's_if_max': results_s_if_max,
             's_if_min': results_s_if_min,
             's_br_max': results_s_br_max,
-            's_br_min': results_s_br_min
+            's_br_min': results_s_br_min,
+            's_min_up_time': results_s_min_up_time,
+            's_min_down_time': results_s_min_down_time
         }
 
         # Storage related slack variables
@@ -1295,12 +1301,15 @@ class NYGrid:
         if_min_penalty = self.PenaltyForInterfaceMWViolation * results_s_if_min / self.baseMVA
         br_max_penalty = self.PenaltyForBranchMwViolation * results_s_br_max / self.baseMVA
         br_min_penalty = self.PenaltyForBranchMwViolation * results_s_br_min / self.baseMVA
+        min_up_time_penalty = self.PenaltyForMinTimeViolation * results_s_min_up_time
+        min_down_time_penalty = self.PenaltyForMinTimeViolation * results_s_min_down_time
 
         total_cost = gen_cost.sum()
         total_penalty = (over_gen_penalty.sum() + load_shed_penalty.sum()
                          + ramp_up_penalty.sum() + ramp_down_penalty.sum()
                          + if_max_penalty.sum() + if_min_penalty.sum()
-                         + br_max_penalty.sum() + br_min_penalty.sum())
+                         + br_max_penalty.sum() + br_min_penalty.sum()
+                         + min_up_time_penalty.sum() + min_down_time_penalty.sum())
         total_cost_penalty = total_cost + total_penalty
 
         costs = {
@@ -1315,7 +1324,9 @@ class NYGrid:
             'if_max_penalty': if_max_penalty,
             'if_min_penalty': if_min_penalty,
             'br_max_penalty': br_max_penalty,
-            'br_min_penalty': br_min_penalty
+            'br_min_penalty': br_min_penalty,
+            'min_up_time_penalty': min_up_time_penalty,
+            'min_down_time_penalty': min_down_time_penalty
         }
 
         if self.NESR > 0:

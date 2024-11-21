@@ -150,8 +150,8 @@ def read_grid_profile(data_dir: Union[str, os.PathLike],
     genmax_profile = pd.read_csv(os.path.join(data_dir, f'genmax_profile_{year}.csv'),
                                  parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
 
-    # genmin_profile = pd.read_csv(os.path.join(data_dir, f'genmin_profile_{year}.csv'),
-    #                              parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+    genmin_profile = pd.read_csv(os.path.join(data_dir, f'genmin_profile_{year}.csv'),
+                                 parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
 
     # Read generator ramp rate profile
     # genramp30_profile = pd.read_csv(os.path.join(data_dir, f'genramp30_profile_{year}.csv'),
@@ -180,7 +180,7 @@ def read_grid_profile(data_dir: Union[str, os.PathLike],
         'load_profile': load_profile,
         # 'gen_profile': gen_profile,
         'genmax_profile': genmax_profile,
-        # 'genmin_profile': genmin_profile,
+        'genmin_profile': genmin_profile,
         # 'genramp30_profile': genramp30_profile,
         'gencost0_profile': gencost0_profile,
         'gencost1_profile': gencost1_profile,

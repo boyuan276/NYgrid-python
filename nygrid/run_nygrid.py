@@ -591,7 +591,7 @@ def run_nygrid_sim(grid_prop: Dict[str, pd.DataFrame],
     nygrid_sim.set_load_sch(grid_profile['load_profile'])
     # nygrid_sim.set_gen_mw_sch(grid_profile['gen_profile'])
     nygrid_sim.set_gen_max_sch(grid_profile['genmax_profile'])
-    # nygrid_sim.set_gen_min_sch(grid_profile['genmin_profile'])
+    nygrid_sim.set_gen_min_sch(grid_profile['genmin_profile'])
     # nygrid_sim.set_gen_ramp_sch(grid_profile['genramp30_profile'])
     nygrid_sim.set_gen_cost_sch(grid_profile['gencost0_profile'],
                                 grid_profile['gencost1_profile'])

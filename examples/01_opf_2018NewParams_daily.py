@@ -199,4 +199,4 @@ if __name__ == '__main__':
 
     tot_elapsed = time.time() - prog_start
     logging.info(f"Finished multi-period OPF simulation {sim_name}.")
-    logging.info("Total elapsed time: {tot_elapsed:.2f} seconds")
+    logging.info(f"Total elapsed time: {tot_elapsed:.2f} seconds")

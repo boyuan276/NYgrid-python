@@ -23,7 +23,7 @@ if __name__ == '__main__':
 
     # %% Simulation settings
     # NOTE: Change the following settings to run the simulation
-    ext_cost_factor = 0.2
+    ext_cost_factor = 0.0
     fo_cost_factor = 0.5
     sim_name = f'2018NewParams_ext{ext_cost_factor}_fo{fo_cost_factor}_daily'
 
@@ -86,7 +86,7 @@ if __name__ == '__main__':
 
     # Decrease external generation cost by 50%
     change_index = grid_prop["gen_prop"]["GEN_ZONE"].isin(
-        ['PJM','IESO']).to_numpy()
+        ['PJM','IESO', 'NE']).to_numpy()
 
     gencost1_profile_new = grid_profile['gencost1_profile'].copy()
     gencost1_profile_new.loc[:, change_index] = \
@@ -95,7 +95,11 @@ if __name__ == '__main__':
 
     # Decrease FO2, KER and FO6 generation costs
     change_index = grid_prop["gen_fuel"]["GEN_FUEL"].isin(
-        ["CT_FO2", "CT_KER", "ST_FO6"]).to_numpy()
+        [
+            # "CT_FO2", 
+            # "CT_KER", 
+            "ST_FO6"
+         ]).to_numpy()
 
     gencost0_profile_new = grid_profile['gencost0_profile'].copy()
     gencost0_profile_new.loc[:, change_index] = \
@@ -118,14 +122,15 @@ if __name__ == '__main__':
     options = {
         'UsePTDF': True,
         'solver': 'gurobi',
-        'PenaltyForLoadShed': 20_000,
+        'PenaltyForLoadShed': 10_000,
         # 'PenaltyForBranchMwViolation': 10_000,
         # 'PenaltyForInterfaceMWViolation': 10_000
     }
 
     solver_options = {
         'NodefileStart': 0.5,
-        'NodefileDir': sim_results_dir
+        'NodefileDir': sim_results_dir,
+        'MIPGap': 1e-3
     }
 
     # No initial condition for the first day

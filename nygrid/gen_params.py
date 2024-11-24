@@ -31,7 +31,8 @@ MIN_UP_TIME = {
     "PV": {"SUN": 0}, # Solar
     "PS": {"WAT": 0}, # Pumped storage
     "ES": {"BAT": 0}, # Battery
-    "Other": {"Other": 0} # Other renewable
+    "Other": {"Other": 0}, # Other renewable
+    "Load": {"Load": 0} # Load
 }
 
 MIN_DOWN_TIME = {
@@ -45,7 +46,8 @@ MIN_DOWN_TIME = {
     "PV": {"SUN": 0}, # Solar
     "PS": {"WAT": 0}, # Pumped storage
     "ES": {"BAT": 0}, # Battery
-    "Other": {"Other": 0} # Other renewable
+    "Other": {"Other": 0}, # Other renewable
+    "Load": {"Load": 0} # Load
 }
 
 

@@ -31,7 +31,7 @@ if __name__ == '__main__':
     valid_days = 30
     lookahead_days = 1
 
-    valid_hours = 24 * valid_days - 1
+    valid_hours = 24 * valid_days
     lookahead_hours = 24 * lookahead_days
 
     sim_start_time = datetime(2018, 1, 1, 0, 0, 0)
@@ -191,7 +191,7 @@ if __name__ == '__main__':
 
         if d < len(timestamp_list) - 1:
             # Set initial conditions for the next iteration
-            time_before_next_cycle = cycle_start_time + timedelta(hours=valid_hours)
+            time_before_next_cycle = cycle_start_time + timedelta(hours=valid_hours-1)
             
             # Set generator initial condition
             last_gen = nygrid_results['PG'].loc[time_before_next_cycle].to_numpy().squeeze()

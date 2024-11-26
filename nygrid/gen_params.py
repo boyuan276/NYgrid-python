@@ -65,6 +65,7 @@ def calc_heat_rate(data, gen_info, x_name, y_name,
 
     # Calculate eco-min
     if calc_eco_min:
+        slope = heat_input_sum / gen_sum
         eco_min_ratio = calc_eco_min_ratio(slope, gen_info['Unit Type'])
     else:
         eco_min_ratio = gen_info['eco_min_ratio_obs']

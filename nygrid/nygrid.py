@@ -9,6 +9,7 @@ import os
 
 import numpy as np
 import pandas as pd
+from datetime import datetime, timedelta
 import pyomo.environ as pyo
 import pypower.api as pp
 from pyomo.opt import SolverStatus, TerminationCondition
@@ -115,9 +116,9 @@ def convert_dcline_2_gen(ppc: Dict[str, np.ndarray],
     dcline_gen[:, PMIN] = np.concatenate([dcline[:, DC_PMIN],
                                           dcline[:, DC_PMIN]])
     # Unlimited ramp rate
-    dcline_gen[:, RAMP_AGC] = np.ones(num_dcline * 2) * 1e6
-    dcline_gen[:, RAMP_10] = np.ones(num_dcline * 2) * 1e6
-    dcline_gen[:, RAMP_30] = np.ones(num_dcline * 2) * 1e6
+    dcline_gen[:, RAMP_AGC] = dcline_gen[:, PMAX]/60
+    dcline_gen[:, RAMP_10] = dcline_gen[:, PMAX]/6
+    dcline_gen[:, RAMP_30] = dcline_gen[:, PMAX]/2
 
     # Add the DC line converted generators to the gen matrix
     ppc_dc['gen'] = np.concatenate([ppc['gen'], dcline_gen])
@@ -190,9 +191,9 @@ def convert_esr_2_gen(ppc: Dict[str, np.ndarray],
     esr_gen[:, GEN_STATUS] = np.ones(num_esr)
     esr_gen[:, PMAX] = np.array(esr_prop[:, ESR_DIS_MAX])
     esr_gen[:, PMIN] = np.array(-1 * esr_prop[:, ESR_CRG_MAX])
-    esr_gen[:, RAMP_AGC] = np.ones(num_esr) * 1e6  # Unlimited ramp rate
-    esr_gen[:, RAMP_10] = np.ones(num_esr) * 1e6  # Unlimited ramp rate
-    esr_gen[:, RAMP_30] = np.ones(num_esr) * 1e6  # Unlimited ramp rate
+    esr_gen[:, RAMP_AGC] = esr_gen[:, PMAX]/60
+    esr_gen[:, RAMP_10] = esr_gen[:, PMAX]/6
+    esr_gen[:, RAMP_30] = esr_gen[:, PMAX]/2
     # Add the ESR converted generators to the gen matrix
     ppc_esr['gen'] = np.concatenate([ppc['gen'], esr_gen])
 
@@ -260,9 +261,9 @@ def convert_vre_2_gen(ppc: Dict[str, np.ndarray],
     vre_gen[:, GEN_STATUS] = np.ones(num_vre)
     vre_gen[:, PMAX] = np.array(vre_prop[:, VRE_PMAX])
     vre_gen[:, PMIN] = np.array(vre_prop[:, VRE_PMIN])
-    vre_gen[:, RAMP_AGC] = np.ones(num_vre) * 1e6  # Unlimited ramp rate
-    vre_gen[:, RAMP_10] = np.ones(num_vre) * 1e6  # Unlimited ramp rate
-    vre_gen[:, RAMP_30] = np.ones(num_vre) * 1e6  # Unlimited ramp rate
+    vre_gen[:, RAMP_AGC] = vre_gen[:, PMAX]/60
+    vre_gen[:, RAMP_10] = vre_gen[:, PMAX]/6
+    vre_gen[:, RAMP_30] = vre_gen[:, PMAX]/2
     # Add the ESR converted generators to the gen matrix
     ppc_vre['gen'] = np.concatenate([ppc['gen'], vre_gen])
 
@@ -323,11 +324,19 @@ class NYGrid:
             self.start_datetime = start_datetime
         elif isinstance(start_datetime, str):
             self.start_datetime = ng_utils.format_date(start_datetime)
+        elif isinstance(start_datetime, datetime):
+            self.start_datetime = pd.Timestamp(start_datetime)
+        else:
+            raise ValueError('start_datetime must be a string or pandas.Timestamp.')
 
         if isinstance(end_datetime, pd.Timestamp):
             self.end_datetime = end_datetime
         elif isinstance(end_datetime, str):
             self.end_datetime = ng_utils.format_date(end_datetime)
+        elif isinstance(end_datetime, datetime):
+            self.end_datetime = pd.Timestamp(end_datetime)
+        else:
+            raise ValueError('end_datetime must be a string or pandas.Timestamp.')
 
         self.delta_t = self.end_datetime - self.start_datetime
         self.timestamp_list = pd.date_range(
@@ -350,7 +359,9 @@ class NYGrid:
         self.ppc['bus'] = (self.grid_prop['bus_prop']
                            .drop(columns=['BUS_ZONE']).to_numpy())
         self.ppc['gen'] = (self.grid_prop['gen_prop']
-                           .drop(columns=['GEN_NAME', 'GEN_ZONE', 'GEN_FUEL']).to_numpy())
+                           .drop(columns=['GEN_NAME', 'GEN_ZONE', 
+                                          'UNIT_TYPE', 'FUEL_TYPE', 'CMT_KEY',
+                                          'MIN_UP_TIME', 'MIN_DOWN_TIME']).to_numpy())
         self.ppc['genfuel'] = (self.grid_prop['gen_fuel']
                                .drop(columns=['GEN_NAME']).to_numpy())
         self.ppc['gencost'] = (self.grid_prop['gencost_prop']
@@ -389,7 +400,7 @@ class NYGrid:
         self.gencost = self.ppc_int['gencost']
 
         # Generator info
-        # what buses are they at?
+        # Generator's bus location
         self.gen_bus = self.gen[:, GEN_BUS].astype(int)
 
         # Build B matrices and phase shift injections
@@ -427,6 +438,40 @@ class NYGrid:
 
         # Get index of VRE converted generators in internal indexing
         self.vre_idx = self.gen_i2e[self.NG - self.NVRE: self.NG]
+
+        # Get index of offline generators
+        non_cvt_gen_idx_offline_e = np.where(self.grid_prop['gen_prop']['CMT_KEY'] == OFFLINE)[0]
+        non_cvt_gen_idx_offline_i = self.gen_i2e[non_cvt_gen_idx_offline_e]
+        self.gen_idx_offline = non_cvt_gen_idx_offline_i
+        # Number of offline generators
+        self.NG_offline = len(self.gen_idx_offline)
+
+        # Get index of available generators
+        non_cvt_gen_idx_avail_e = np.where(self.grid_prop['gen_prop']['CMT_KEY'] == AVAILABLE)[0]
+        non_cvt_gen_idx_avail_i = self.gen_i2e[non_cvt_gen_idx_avail_e]
+        self.gen_idx_avail = non_cvt_gen_idx_avail_i
+        # Number of available generators needs to be committed
+        self.NG_avail = len(self.gen_idx_avail)
+
+        # Get index of must run generators
+        non_cvt_gen_idx_mustrun_e = np.where(self.grid_prop['gen_prop']['CMT_KEY'] == MUSTRUN)[0]
+        non_cvt_gen_idx_mustrun_e = self.gen_i2e[non_cvt_gen_idx_mustrun_e]
+        self.gen_idx_mustrun = np.hstack([non_cvt_gen_idx_mustrun_e,
+                                         self.dcline_idx_f,
+                                         self.dcline_idx_t,
+                                         self.esr_idx,
+                                         self.vre_idx])
+        # Number of must run generators
+        self.NG_mustrun = len(self.gen_idx_mustrun)
+
+        # Generator min up/down time
+        self.min_up_time = np.zeros(self.NG)
+        self.min_up_time[self.gen_idx_non_cvt] = self.grid_prop['gen_prop']['MIN_UP_TIME'].to_numpy()
+        self.min_up_time = self.min_up_time.astype(int)
+
+        self.min_down_time = np.zeros(self.NG)
+        self.min_down_time[self.gen_idx_non_cvt] = self.grid_prop['gen_prop']['MIN_DOWN_TIME'].to_numpy()
+        self.min_down_time = self.min_down_time.astype(int)
 
         # Get mapping from load to bus
         self.load_map = np.zeros((self.NB, self.NL))
@@ -484,6 +529,14 @@ class NYGrid:
         # Linear cost slope coefficients in p.u.
         self.gencost_1 = np.ones((self.NT, self.NG)) * \
             self.gencost[:, COST] * self.baseMVA
+        
+        # Generator startup cost in p.u.
+        self.gencost_startup = np.ones((self.NT, self.NG)) * \
+            self.gencost[:, STARTUP] * self.baseMVA
+        
+        # Generator shutdown cost in p.u.
+        self.gencost_shutdown = np.ones((self.NT, self.NG)) * \
+            self.gencost[:, SHUTDOWN] * self.baseMVA
 
         # Convert load to p.u.
         self.load_pu = np.ones((self.NT, self.NL)) * \
@@ -491,6 +544,9 @@ class NYGrid:
 
         # Generator initial condition
         self.gen_init = None
+        self.gen_init_cmt = None
+        self.gen_last_startup_hour = None
+        self.gen_last_shutdown_hour = None
 
         # Add ESR properties
         if self.grid_prop['esr_prop'] is not None and self.grid_prop['esr_prop'].size > 0:
@@ -537,7 +593,7 @@ class NYGrid:
         self.PenaltyForLoadShed = 5_000  # $/MWh
         self.PenaltyForRampViolation = 11_000  # $/MW
         # UC module
-        self.PenaltyForMinTimeViolation = 1_000  # $/MWh, Not used
+        self.PenaltyForMinTimeViolation = 1_000  # $/MWh
         self.PenaltyForNumberCommitViolation = 10_000  # $/hour, Not used
         # RS module
         self.NoReserveViolation = False
@@ -801,6 +857,59 @@ class NYGrid:
 
         else:
             raise ValueError('No generation cost profile is provided.')
+        
+
+    def set_gen_cost_startup_sch(self, gen_cost_startup: pd.DataFrame) -> None:
+        """
+        Set generator startup cost data from startup cost profile.
+
+        Parameters
+        ----------
+        gen_startup_cost: pandas.DataFrame
+            Generator startup cost profile of thermal generators.
+
+        Returns
+        -------
+        None
+        """
+
+        if gen_cost_startup is not None and gen_cost_startup.size > 0:
+            # Slice the generator profile to the simulation period
+            gen_cost_startup = gen_cost_startup[self.start_datetime: self.end_datetime]
+            gen_order = self.grid_prop['gen_prop']['GEN_NAME'].values
+            gen_cost_startup_sorted = gen_cost_startup[gen_order].to_numpy()
+
+            # Generator startup cost in p.u.
+            # Thermal generators: Use user-defined time series schedule
+            self.gencost_startup[:, self.gen_idx_non_cvt] = gen_cost_startup_sorted
+        else:
+            raise ValueError('No generator startup cost profile is provided.')
+        
+    def set_gen_cost_shutdown_sch(self, gen_cost_shutdown: pd.DataFrame) -> None:
+        """
+        Set generator shutdown cost data from shutdown cost profile.
+
+        Parameters
+        ----------
+        gen_shutdown_cost: pandas.DataFrame
+            Generator shutdown cost profile of thermal generators.
+
+        Returns
+        -------
+        None
+        """
+
+        if gen_cost_shutdown is not None and gen_cost_shutdown.size > 0:
+            # Slice the generator profile to the simulation period
+            gen_cost_shutdown = gen_cost_shutdown[self.start_datetime: self.end_datetime]
+            gen_order = self.grid_prop['gen_prop']['GEN_NAME'].values
+            gen_cost_shutdown_sorted = gen_cost_shutdown[gen_order].to_numpy()
+
+            # Generator shutdown cost in p.u.
+            # Thermal generators: Use user-defined time series schedule
+            self.gencost_shutdown[:, self.gen_idx_non_cvt] = gen_cost_shutdown_sorted
+        else:
+            raise ValueError('No generator shutdown cost profile is provided.')
 
     def relax_external_branch_lim(self):
         """
@@ -831,6 +940,65 @@ class NYGrid:
             self.gen_init = gen_init / self.baseMVA
         else:
             Warning('No generator initial condition is provided.')
+
+    def set_gen_init_cmt_data(self, gen_init_cmt: Optional[np.ndarray]) -> None:
+        """
+        Get generator initial condition.
+
+        Parameters
+        ----------
+            gen_init (numpy.ndarray): A 1-d array of generator initial
+                unit commitment condition
+
+        """
+
+        if gen_init_cmt is not None and gen_init_cmt.size > 0:
+            # Convert to internal generator indexing
+            gen_init_cmt = pd.DataFrame(
+                gen_init_cmt, index=self.gen_idx_avail).sort_index().to_numpy().squeeze()
+            self.gen_init_cmt = gen_init_cmt
+        else:
+            Warning('No generator initial commitment condition is provided.')
+
+    def set_gen_last_startup_data(self, gen_last_startup_hour: Optional[np.ndarray]) -> None:
+        """
+        Get generator past startup records.
+
+        Parameters
+        ----------
+            gen_past_startup_hour (numpy.ndarray): A 2-d array of generator past
+                unit commitment startup record.
+
+        """
+
+        if gen_last_startup_hour is not None and gen_last_startup_hour.size > 0:
+            # Convert to internal generator indexing
+            gen_last_startup_hour = pd.DataFrame(
+                gen_last_startup_hour, 
+                index=self.gen_idx_avail).sort_index().to_numpy().squeeze()
+            self.gen_last_startup_hour = gen_last_startup_hour
+        else:
+            Warning('No generator last startup hour is provided.')
+
+    def set_gen_last_shutdown_data(self, gen_last_shutdown_hour: Optional[np.ndarray]) -> None:
+        """
+        Get generator past shutdown records.
+
+        Parameters
+        ----------
+            gen_past_shutdown_hour (numpy.ndarray): A 2-d array of generator past
+                unit commitment shutdown record.
+
+        """
+
+        if gen_last_shutdown_hour is not None and gen_last_shutdown_hour.size > 0:
+            # Convert to internal generator indexing
+            gen_last_shutdown_hour = pd.DataFrame(
+                gen_last_shutdown_hour, 
+                index=self.gen_idx_avail).sort_index().to_numpy().squeeze()
+            self.gen_last_shutdown_hour = gen_last_shutdown_hour
+        else:
+            Warning('No generator initial commitment condition is provided.')
 
     def set_esr_init_data(self, esr_init: Optional[np.ndarray]) -> None:
         """
@@ -878,6 +1046,7 @@ class NYGrid:
 
         # Add variables
         optimizer.add_vars_ed()
+        optimizer.add_vars_uc()
         optimizer.add_vars_pf()
 
         # Add ES variables if there are ESRs
@@ -889,6 +1058,7 @@ class NYGrid:
 
         # Add constraints
         optimizer.add_constrs_ed()
+        optimizer.add_constrs_uc()
         optimizer.add_constrs_pf()
 
         # Add ES constraints if there are ESRs
@@ -964,6 +1134,17 @@ class NYGrid:
                                   columns=gen_order).sort_index(axis=1)
         variables['PG'] = results_pg
 
+        # Generator commitment
+        results_commit = np.array(self.model.u[:, :]()).reshape(self.NT, self.NG_avail)
+        results_startup = np.array(self.model.v[:,:]()).reshape(self.NT, self.NG_avail)
+        results_shutdown = np.array(self.model.w[:,:]()).reshape(self.NT, self.NG_avail)
+        variables['genCommit'] = pd.DataFrame(results_commit, index=self.timestamp_list,
+                                           columns=gen_order[self.gen_idx_avail]).sort_index(axis=1)
+        variables['genStartup'] = pd.DataFrame(results_startup, index=self.timestamp_list,
+                                            columns=gen_order[self.gen_idx_avail]).sort_index(axis=1)
+        variables['genShutdown'] = pd.DataFrame(results_shutdown, index=self.timestamp_list,
+                                             columns=gen_order[self.gen_idx_avail]).sort_index(axis=1)
+
         # Branch power flow
         branch_pf = (np.array(self.model.PF[:, :]())
                      .reshape(self.NT, self.NBR) * self.baseMVA)
@@ -1030,22 +1211,22 @@ class NYGrid:
         # %% Prices and dual variables
 
         # Bus locational marginal price (LMP)
-        if self.UsePTDF:
-            results_lmp = np.zeros((self.NT, self.NB))
-            for t in range(self.NT):
-                for n in range(self.NL):
-                    results_lmp[t, n] = (np.abs(self.model.dual[
-                        self.model.c_load_set[t, n]]) / self.baseMVA)
-            results_lmp = pd.DataFrame(results_lmp, index=self.timestamp_list)
-            variables['LMP'] = results_lmp
-        else:
-            results_lmp = np.zeros((self.NT, self.NB))
-            for t in range(self.NT):
-                for n in range(self.NB):
-                    results_lmp[t, n] = (np.abs(self.model.dual[
-                        self.model.c_pf[t, n]]) / self.baseMVA)
-            results_lmp = pd.DataFrame(results_lmp, index=self.timestamp_list)
-            variables['LMP'] = results_lmp
+        # if self.UsePTDF:
+        #     results_lmp = np.zeros((self.NT, self.NB))
+        #     for t in range(self.NT):
+        #         for n in range(self.NL):
+        #             results_lmp[t, n] = (np.abs(self.model.dual[
+        #                 self.model.c_load_set[t, n]]) / self.baseMVA)
+        #     results_lmp = pd.DataFrame(results_lmp, index=self.timestamp_list)
+        #     variables['LMP'] = results_lmp
+        # else:
+        #     results_lmp = np.zeros((self.NT, self.NB))
+        #     for t in range(self.NT):
+        #         for n in range(self.NB):
+        #             results_lmp[t, n] = (np.abs(self.model.dual[
+        #                 self.model.c_pf[t, n]]) / self.baseMVA)
+        #     results_lmp = pd.DataFrame(results_lmp, index=self.timestamp_list)
+        #     variables['LMP'] = results_lmp
 
         # %% Slack variables
 
@@ -1063,6 +1244,10 @@ class NYGrid:
                             .reshape(self.NT, self.NBR) * self.baseMVA)
         results_s_br_min = (np.array(self.model.s_br_min[:, :]())
                             .reshape(self.NT, self.NBR) * self.baseMVA)
+        results_s_min_up_time = (np.array(self.model.s_min_up_time[:, :]())
+                                 .reshape(self.NT, self.NG_avail))
+        results_s_min_down_time = (np.array(self.model.s_min_down_time[:, :]())
+                                   .reshape(self.NT, self.NG_avail))
 
         slack_vars = {
             's_ramp_up': results_s_ramp_up,
@@ -1072,7 +1257,9 @@ class NYGrid:
             's_if_max': results_s_if_max,
             's_if_min': results_s_if_min,
             's_br_max': results_s_br_max,
-            's_br_min': results_s_br_min
+            's_br_min': results_s_br_min,
+            's_min_up_time': results_s_min_up_time,
+            's_min_down_time': results_s_min_down_time
         }
 
         # Storage related slack variables
@@ -1100,7 +1287,11 @@ class NYGrid:
         # %% Cost and penalties
 
         pg_pu = np.array(self.model.PG[:, :]()).reshape(self.NT, self.NG)
-        gen_cost = self.gencost_0 + self.gencost_1 * pg_pu
+        # gen_cost = self.gencost_0 + self.gencost_1 * pg_pu
+        gen_cost = self.gencost_1 * pg_pu
+        gen_cost_noload = self.gencost_0[:, self.gen_idx_avail] * results_commit
+        gen_cost_startup = self.gencost_startup[:, self.gen_idx_avail] * results_startup
+        gen_cost_shutdown = self.gencost_shutdown[:, self.gen_idx_avail] * results_shutdown
 
         over_gen_penalty = self.PenaltyForOverGeneration * results_s_over_gen / self.baseMVA
         load_shed_penalty = self.PenaltyForLoadShed * results_s_load_shed / self.baseMVA
@@ -1110,16 +1301,22 @@ class NYGrid:
         if_min_penalty = self.PenaltyForInterfaceMWViolation * results_s_if_min / self.baseMVA
         br_max_penalty = self.PenaltyForBranchMwViolation * results_s_br_max / self.baseMVA
         br_min_penalty = self.PenaltyForBranchMwViolation * results_s_br_min / self.baseMVA
+        min_up_time_penalty = self.PenaltyForMinTimeViolation * results_s_min_up_time
+        min_down_time_penalty = self.PenaltyForMinTimeViolation * results_s_min_down_time
 
         total_cost = gen_cost.sum()
         total_penalty = (over_gen_penalty.sum() + load_shed_penalty.sum()
                          + ramp_up_penalty.sum() + ramp_down_penalty.sum()
                          + if_max_penalty.sum() + if_min_penalty.sum()
-                         + br_max_penalty.sum() + br_min_penalty.sum())
+                         + br_max_penalty.sum() + br_min_penalty.sum()
+                         + min_up_time_penalty.sum() + min_down_time_penalty.sum())
         total_cost_penalty = total_cost + total_penalty
 
         costs = {
             'gen_cost': gen_cost,
+            'gen_cost_noload': gen_cost_noload,
+            'gen_cost_startup': gen_cost_startup,
+            'gen_cost_shutdown': gen_cost_shutdown,
             'over_gen_penalty': over_gen_penalty,
             'load_shed_penalty': load_shed_penalty,
             'ramp_up_penalty': ramp_up_penalty,
@@ -1127,7 +1324,9 @@ class NYGrid:
             'if_max_penalty': if_max_penalty,
             'if_min_penalty': if_min_penalty,
             'br_max_penalty': br_max_penalty,
-            'br_min_penalty': br_min_penalty
+            'br_min_penalty': br_min_penalty,
+            'min_up_time_penalty': min_up_time_penalty,
+            'min_down_time_penalty': min_down_time_penalty
         }
 
         if self.NESR > 0:

@@ -17,6 +17,7 @@ dependencies:
   - geopandas
   - contextily
   - ipopt
+  - openpyxl
   - pip
   - pip:
     - pypower==5.1.15

@@ -32,7 +32,8 @@ INSTALL_REQUIRES = [
     "pandas",
     "pyomo",
     "pypower",
-    "matplotlib"
+    "matplotlib",
+    "openpyxl"
 ]
 PYTHON_REQUIRES = ">=3.7"
 

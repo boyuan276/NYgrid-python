@@ -9,7 +9,17 @@ import nygrid.nygrid as ng_grid
 import nygrid.preprocessing as ng_prep
 
 
-def read_grid_prop(grid_data_dir: Union[str, os.PathLike]
+def read_grid_prop(grid_data_dir: Union[str, os.PathLike],
+                   bus_prop_file: str = 'bus_prop.csv',
+                   gen_prop_file: str = 'gen_prop.csv',
+                   genfuel_prop_file: str = 'genfuel_prop.csv',
+                   gencost_prop_file: str = 'gencost_prop.csv',
+                   branch_prop_file: str = 'branch_prop.csv',
+                   if_lims_prop_file: str = 'if_lims_prop.csv',
+                   if_map_prop_file: str = 'if_map_prop.csv',
+                   esr_prop_file: str = 'esr_prop.csv',
+                   dcline_prop_file: str = 'dcline_prop.csv'
+
                    ) -> Dict[str, pd.DataFrame]:
     """
     Read grid data from csv files.
@@ -18,6 +28,24 @@ def read_grid_prop(grid_data_dir: Union[str, os.PathLike]
     ----------
     grid_data_dir: str
         Path to the grid data directory.
+    bus_prop_file: str, optional
+        Bus properties file name, by default 'bus_prop.csv'
+    gen_prop_file: str, optional
+        Generator properties file name, by default 'gen_prop.csv'
+    genfuel_prop_file: str, optional
+        Generator fuel type file name, by default 'genfuel_prop.csv'
+    gencost_prop_file: str, optional
+        Generator cost properties file name, by default 'gencost_prop.csv'
+    branch_prop_file: str, optional
+        AC line properties file name, by default 'branch_prop.csv'
+    if_lims_prop_file: str, optional
+        Interface limit properties file name, by default 'if_lims_prop.csv'
+    if_map_prop_file: str, optional
+        Interface mapping file name, by default 'if_map_prop.csv'
+    esr_prop_file: str, optional
+        Energy storage properties file name, by default 'esr_prop.csv'
+    dcline_prop_file: str, optional
+        DC line properties file name, by default 'dcline_prop.csv'
 
     Returns
     -------
@@ -30,35 +58,38 @@ def read_grid_prop(grid_data_dir: Union[str, os.PathLike]
     """
 
     # Read bus properties
-    filename = os.path.join(grid_data_dir, 'bus_prop.csv')
+    filename = os.path.join(grid_data_dir, bus_prop_file)
     if os.path.exists(filename):
         bus_prop = pd.read_csv(filename)
     else:
         raise ValueError('Bus properties file does not exist.')
 
     # Read generator properties
-    filename = os.path.join(grid_data_dir, 'gen_prop.csv')
+    filename = os.path.join(grid_data_dir, gen_prop_file)
     if os.path.exists(filename):
         gen_prop = pd.read_csv(filename)
     else:
         raise ValueError('Generator properties file does not exist.')
 
     # Read generator fuel type
-    filename = os.path.join(grid_data_dir, 'genfuel_prop.csv')
+    filename = os.path.join(grid_data_dir, genfuel_prop_file)
     if os.path.exists(filename):
         gen_fuel = pd.read_csv(filename)
     else:
         raise ValueError('Generator fuel type file does not exist.')
 
     # Read generator cost properties
-    filename = os.path.join(grid_data_dir, 'gencost_prop.csv')
+    filename = os.path.join(grid_data_dir, gencost_prop_file)
     if os.path.exists(filename):
         gencost_prop = pd.read_csv(filename)
+        # Set negative cost to zero
+        gencost_prop['COST_0'] = gencost_prop['COST_0'].clip(lower=0)
+        gencost_prop['COST_1'] = gencost_prop['COST_1'].clip(lower=0)
     else:
         raise ValueError('Generator cost properties file does not exist.')
 
     # Read AC line properties
-    filename = os.path.join(grid_data_dir, 'branch_prop.csv')
+    filename = os.path.join(grid_data_dir, branch_prop_file)
     if os.path.exists(filename):
         branch_prop = pd.read_csv(filename)
         # Replace default 0 (unlimited) with 9999
@@ -67,21 +98,21 @@ def read_grid_prop(grid_data_dir: Union[str, os.PathLike]
         raise ValueError('AC line properties file does not exist.')
 
     # Read interface properties
-    filename = os.path.join(grid_data_dir, 'if_lims_prop.csv')
+    filename = os.path.join(grid_data_dir, if_lims_prop_file)
     if os.path.exists(filename):
         if_lim_prop = pd.read_csv(filename)
     else:
         raise ValueError('Interface limit properties file does not exist.')
 
     # Read interface mapping
-    filename = os.path.join(grid_data_dir, 'if_map_prop.csv')
+    filename = os.path.join(grid_data_dir, if_map_prop_file)
     if os.path.exists(filename):
         if_map_prop = pd.read_csv(filename)
     else:
         raise ValueError('Interface mapping file does not exist.')
 
     # Read storage properties (Optional)
-    filename = os.path.join(grid_data_dir, 'esr_prop.csv')
+    filename = os.path.join(grid_data_dir, esr_prop_file)
     if os.path.exists(filename):
         esr_prop = pd.read_csv(filename)
     else:
@@ -89,7 +120,7 @@ def read_grid_prop(grid_data_dir: Union[str, os.PathLike]
         esr_prop = None
 
     # Read DC line properties (Optional)
-    filename = os.path.join(grid_data_dir, 'dcline_prop.csv')
+    filename = os.path.join(grid_data_dir, dcline_prop_file)
     if os.path.isfile(filename):
         dcline_prop = pd.read_csv(filename)
     else:
@@ -140,8 +171,8 @@ def read_grid_profile(data_dir: Union[str, os.PathLike],
         'Bus', '').astype(int)
 
     # Read generation profile
-    gen_profile = pd.read_csv(os.path.join(data_dir, f'gen_profile_{year}.csv'),
-                              parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+    # gen_profile = pd.read_csv(os.path.join(data_dir, f'gen_profile_{year}.csv'),
+    #                           parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
 
     # Read generator capacity limit profile
     genmax_profile = pd.read_csv(os.path.join(data_dir, f'genmax_profile_{year}.csv'),
@@ -150,10 +181,6 @@ def read_grid_profile(data_dir: Union[str, os.PathLike],
     genmin_profile = pd.read_csv(os.path.join(data_dir, f'genmin_profile_{year}.csv'),
                                  parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
 
-    # Read generator ramp rate profile
-    genramp30_profile = pd.read_csv(os.path.join(data_dir, f'genramp30_profile_{year}.csv'),
-                                    parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
-
     # Read generator cost profile (linear)
     gencost0_profile = pd.read_csv(os.path.join(data_dir, f'gencost0_profile_{year}.csv'),
                                    parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
@@ -161,14 +188,27 @@ def read_grid_profile(data_dir: Union[str, os.PathLike],
     gencost1_profile = pd.read_csv(os.path.join(data_dir, f'gencost1_profile_{year}.csv'),
                                    parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
 
+    gencost_startup_profile = pd.read_csv(os.path.join(data_dir, f'gencost_startup_profile_{year}.csv'),
+                                          parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+
+    # gencost_shutdown_profile = pd.read_csv(os.path.join(data_dir, f'gencost_shutdown_profile_{year}.csv'),
+    #                                        parse_dates=['TimeStamp'], index_col='TimeStamp').asfreq('H')
+
+    # Set negative cost to zero
+    gencost0_profile[gencost0_profile < 0] = 0
+    gencost1_profile[gencost1_profile < 0] = 0
+    gencost_startup_profile[gencost_startup_profile < 0] = 0
+    # gencost_shutdown_profile[gencost_shutdown_profile < 0] = 0
+
     grid_profile = {
         'load_profile': load_profile,
-        'gen_profile': gen_profile,
+        # 'gen_profile': gen_profile,
         'genmax_profile': genmax_profile,
         'genmin_profile': genmin_profile,
-        'genramp30_profile': genramp30_profile,
         'gencost0_profile': gencost0_profile,
         'gencost1_profile': gencost1_profile,
+        'gencost_startup_profile': gencost_startup_profile,
+        # 'gencost_shutdown_profile': gencost_shutdown_profile
     }
 
     return grid_profile
@@ -514,15 +554,19 @@ def read_electrification_data(electrification_dict: Dict[str, Any],
     return electrification_dict
 
 
-def run_nygrid_one_day(grid_prop: Dict[str, pd.DataFrame],
-                       grid_profile: Dict[str, pd.DataFrame],
-                       start_datetime: pd.Timestamp,
-                       end_datetime: pd.Timestamp,
-                       options: Dict[str, Any],
-                       gen_init: Optional[np.ndarray],
-                       soc_init: Optional[np.ndarray],
-                       verbose: bool = False
-                       ) -> Dict[str, pd.DataFrame]:
+def run_nygrid_sim(grid_prop: Dict[str, pd.DataFrame],
+                   grid_profile: Dict[str, pd.DataFrame],
+                   start_datetime: pd.Timestamp,
+                   end_datetime: pd.Timestamp,
+                   options: Dict[str, Any],
+                   solver_options: Optional[Dict[str, Any]],
+                   gen_init: Optional[np.ndarray],
+                   gen_init_cmt: Optional[np.ndarray],
+                   soc_init: Optional[np.ndarray],
+                   gen_last_startup_hour: Optional[np.ndarray] = None,
+                   gen_last_shutdown_hour: Optional[np.ndarray] = None,
+                   verbose: bool = False
+                   ) -> Dict[str, pd.DataFrame]:
     """
     Run NYGrid simulation for one day
 
@@ -547,6 +591,10 @@ def run_nygrid_one_day(grid_prop: Dict[str, pd.DataFrame],
         Initial generator status
     init_soc : np.ndarray
         Initial ESR SOC
+    gen_last_startup_hour : np.ndarray, optional
+        Hour since the last generator startup
+    gen_last_shutdown_hour : np.ndarray, optional
+        Hour since the last generator shutdown
     verbose : bool, optional
         Print verbose output, by default
 
@@ -564,12 +612,16 @@ def run_nygrid_one_day(grid_prop: Dict[str, pd.DataFrame],
 
     # Set load and generation time series data
     nygrid_sim.set_load_sch(grid_profile['load_profile'])
-    nygrid_sim.set_gen_mw_sch(grid_profile['gen_profile'])
+    # nygrid_sim.set_gen_mw_sch(grid_profile['gen_profile'])
     nygrid_sim.set_gen_max_sch(grid_profile['genmax_profile'])
     nygrid_sim.set_gen_min_sch(grid_profile['genmin_profile'])
-    nygrid_sim.set_gen_ramp_sch(grid_profile['genramp30_profile'])
+    # nygrid_sim.set_gen_ramp_sch(grid_profile['genramp30_profile'])
     nygrid_sim.set_gen_cost_sch(grid_profile['gencost0_profile'],
                                 grid_profile['gencost1_profile'])
+    nygrid_sim.set_gen_cost_startup_sch(
+        grid_profile['gencost_startup_profile'])
+    # nygrid_sim.set_gen_cost_shutdown_sch(
+    # grid_profile['gencost_shutdown_profile'])
 
     if 'genmax_profile_vre' in grid_profile:
         nygrid_sim.set_vre_max_sch(grid_profile['genmax_profile_vre'])
@@ -580,16 +632,89 @@ def run_nygrid_one_day(grid_prop: Dict[str, pd.DataFrame],
     # Set generator initial condition
     nygrid_sim.set_gen_init_data(gen_init=gen_init)
 
+    # Set generator initial commitment condition
+    nygrid_sim.set_gen_init_cmt_data(gen_init_cmt=gen_init_cmt)
+
     # Set ESR initial condition
     nygrid_sim.set_esr_init_data(esr_init=soc_init)
+
+    # Set last startup and shutdown hour
+    nygrid_sim.set_gen_last_startup_data(gen_last_startup_hour)
+    nygrid_sim.set_gen_last_shutdown_data(gen_last_shutdown_hour)
 
     # Set options
     nygrid_sim.set_options(options)
 
     # Solve DC OPF
-    nygrid_sim.solve_dc_opf()
+    nygrid_sim.solve_dc_opf(solver_options)
 
     # Get nygrid_results
     results = nygrid_sim.get_results_dc_opf()
 
     return results
+
+
+def get_last_startup_hour(results: Dict[str, pd.DataFrame],
+                          hour_before_start: pd.Timestamp) -> np.ndarray:
+    """
+    Get the hour since the last generator startup
+
+    Parameters
+    ----------
+    results : dict
+        Dictionary of results
+    hour_before_start : pd.Timestamp
+        Hour before the start of the simulation
+
+    Returns
+    -------
+    hour_since_last_startup : np.ndarray
+        Hour since the last generator startup
+    """
+
+    hour_since_last_startup = np.zeros(
+        results['genStartup'].shape[1], dtype=int)
+
+    for ii in range(results['genStartup'].shape[1]):
+        startup_record = results['genStartup'][:hour_before_start][ii]
+        if startup_record.sum() > 0:
+            last_startup_hour = startup_record[startup_record > 0].index[-1]
+            hour_since_last_startup[ii] = int(
+                (hour_before_start - last_startup_hour).total_seconds() / 3600)
+        else:
+            hour_since_last_startup[ii] = 999
+
+    return hour_since_last_startup
+
+
+def get_last_shutdown_hour(results: Dict[str, pd.DataFrame],
+                           hour_before_start: pd.Timestamp) -> np.ndarray:
+    """
+    Get the hour since the last generator shutdown
+
+    Parameters
+    ----------
+    results : dict
+        Dictionary of results
+    hour_before_start : pd.Timestamp
+        Hour before the start of the simulation
+
+    Returns
+    -------
+    hour_since_last_shutdown : np.ndarray
+        Hour since the last generator shutdown    
+    """
+
+    hour_since_last_shutdown = np.zeros(
+        results['genShutdown'].shape[1], dtype=int)
+
+    for ii in range(results['genShutdown'].shape[1]):
+        shutdown_record = results['genShutdown'][:hour_before_start][ii]
+        if shutdown_record.sum() > 0:
+            last_shutdown_hour = shutdown_record[shutdown_record > 0].index[-1]
+            hour_since_last_shutdown[ii] = int(
+                (hour_before_start - last_shutdown_hour).total_seconds()/3600)
+        else:
+            hour_since_last_shutdown[ii] = 999
+
+    return hour_since_last_shutdown

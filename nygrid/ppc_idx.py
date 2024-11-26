@@ -5,7 +5,15 @@ from pypower.idx_gen import (GEN_BUS, PG, QG, QMAX, QMIN, VG, MBASE,
                              GEN_STATUS, PMAX, PMIN, RAMP_AGC, RAMP_10, RAMP_30)
 from pypower.idx_brch import (F_BUS, T_BUS, BR_R, BR_X, BR_B,
                               RATE_A, RATE_B, RATE_C, TAP, SHIFT, BR_STATUS)
-from pypower.idx_cost import MODEL, NCOST, POLYNOMIAL, COST
+from pypower.idx_cost import MODEL, STARTUP, SHUTDOWN, NCOST, POLYNOMIAL, COST
+
+# Define index for generator commitment keys
+CMT_KEY = 25
+MIN_UP_TIME = 26
+MIN_DOWN_TIME = 27
+OFFLINE = -1
+AVAILABLE = 1
+MUSTRUN = 2
 
 # Define index for DC lines
 DC_NAME = 0

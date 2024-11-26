@@ -1,0 +1,309 @@
+GEN_NAME,GEN_FUEL
+"Danskammer 1(2480,1)",ST_NG
+"Danskammer 2(2480,2)",ST_NG
+"Danskammer 3(2480,3)",ST_NG
+"Danskammer 4(2480,4)",ST_NG
+"Arthur Kill ST 2(2490,20)",ST_NG
+"Arthur Kill ST 3(2490,30)",ST_NG
+"Arthur Kill GT 1(2490,CT0001)",CT_NG
+"East River 1(2493,1)",CC_NG
+"East River 2(2493,2)",CC_NG
+"Gowanus 1-1(2494,CT01-1)",CT_FO2
+"Gowanus 1-2(2494,CT01-2)",CT_FO2
+"Gowanus 1-3(2494,CT01-3)",CT_FO2
+"Gowanus 1-4(2494,CT01-4)",CT_FO2
+"Gowanus 1-5(2494,CT01-5)",CT_FO2
+"Gowanus 1-6(2494,CT01-6)",CT_FO2
+"Gowanus 1-7(2494,CT01-7)",CT_FO2
+"Gowanus 1-8(2494,CT01-8)",CT_FO2
+"Gowanus 2-1(2494,CT02-1)",CT_FO2
+"Gowanus 2-2(2494,CT02-2)",CT_FO2
+"Gowanus 2-3(2494,CT02-3)",CT_FO2
+"Gowanus 2-4(2494,CT02-4)",CT_FO2
+"Gowanus 2-5(2494,CT02-5)",CT_FO2
+"Gowanus 2-6(2494,CT02-6)",CT_FO2
+"Gowanus 2-7(2494,CT02-7)",CT_FO2
+"Gowanus 2-8(2494,CT02-8)",CT_FO2
+"Gowanus 3-1(2494,CT03-1)",CT_FO2
+"Gowanus 3-2(2494,CT03-2)",CT_FO2
+"Gowanus 3-3(2494,CT03-3)",CT_FO2
+"Gowanus 3-4(2494,CT03-4)",CT_FO2
+"Gowanus 3-5(2494,CT03-5)",CT_FO2
+"Gowanus 3-6(2494,CT03-6)",CT_FO2
+"Gowanus 3-7(2494,CT03-7)",CT_FO2
+"Gowanus 3-8(2494,CT03-8)",CT_FO2
+"Gowanus 4-1(2494,CT04-1)",CT_FO2
+"Gowanus 4-2(2494,CT04-2)",CT_FO2
+"Gowanus 4-3(2494,CT04-3)",CT_FO2
+"Gowanus 4-4(2494,CT04-4)",CT_FO2
+"Gowanus 4-5(2494,CT04-5)",CT_FO2
+"Gowanus 4-6(2494,CT04-6)",CT_FO2
+"Gowanus 4-7(2494,CT04-7)",CT_FO2
+"Gowanus 4-8(2494,CT04-8)",CT_FO2
+"Hudson Ave 3(2496,CT0003)",CT_KER
+"Hudson Ave 5(2496,CT0005)",CT_KER
+"Narrows 1-1(2499,CT01-1)",CT_FO2
+"Narrows 1-2(2499,CT01-2)",CT_FO2
+"Narrows 1-3(2499,CT01-3)",CT_FO2
+"Narrows 1-4(2499,CT01-4)",CT_FO2
+"Narrows 1-5(2499,CT01-5)",CT_FO2
+"Narrows 1-6(2499,CT01-6)",CT_FO2
+"Narrows 1-7(2499,CT01-7)",CT_FO2
+"Narrows 1-8(2499,CT01-8)",CT_FO2
+"Narrows 2-1(2499,CT02-1)",CT_FO2
+"Narrows 2-2(2499,CT02-2)",CT_FO2
+"Narrows 2-3(2499,CT02-3)",CT_FO2
+"Narrows 2-4(2499,CT02-4)",CT_FO2
+"Narrows 2-5(2499,CT02-5)",CT_FO2
+"Narrows 2-6(2499,CT02-6)",CT_FO2
+"Narrows 2-7(2499,CT02-7)",CT_FO2
+"Narrows 2-8(2499,CT02-8)",CT_FO2
+"Ravenswood ST 01(2500,10)",ST_FO6
+"Ravenswood ST 02(2500,20)",ST_FO6
+"Ravenswood ST 03(2500,30)",ST_FO6
+"Ravenswood 01(2500,CT0001)",CT_NG
+"Ravenswood 10(2500,CT0010)",CT_KER
+"Ravenswood 11(2500,CT0011)",CT_KER
+"Ravenswood CC 04(2500,UCC001)",CC_NG
+"59 St.  GT 1(2503,CT0001)",CT_KER
+"74 St.  GT 1(2504,CT0001)",CT_KER
+"74 St.  GT 2(2504,CT0002)",CT_KER
+"Barrett ST 01(2511,10)",ST_NG
+"Barrett ST 02(2511,20)",ST_NG
+"Barrett GT 01(2511,U00004)",CT_NG
+"Barrett GT 02(2511,U00005)",CT_NG
+"Barrett 03(2511,U00006)",CT_NG
+"Barrett 04(2511,U00007)",CT_NG
+"Barrett 05(2511,U00008)",CT_NG
+"Barrett 06(2511,U00009)",CT_NG
+"Barrett 08(2511,U00011)",CT_NG
+"Barrett 09(2511,U00012)",CT_NG
+"Barrett 10(2511,U00014)",CT_NG
+"Barrett 11(2511,U00016)",CT_NG
+"Barrett 12(2511,U00018)",CT_NG
+"East Hampton GT 01(2512,UGT001)",CT_FO2
+"Glenwood GT 02(2514,U00020)",CT_FO2
+"Glenwood GT 03(2514,U00021)",CT_FO2
+"Northport 1(2516,1)",ST_NG
+"Northport 2(2516,2)",ST_NG
+"Northport 3(2516,3)",ST_NG
+"Northport 4(2516,4)",ST_NG
+"Northport GT(2516,UGT001)",CT_FO2
+"Port Jefferson 3(2517,3)",ST_FO6
+"Port Jefferson 4(2517,4)",ST_FO6
+"Port Jefferson GT 01(2517,UGT001)",CT_FO2
+"Port Jefferson GT 02(2517,UGT002)",CT_NG
+"Port Jefferson GT 03(2517,UGT003)",CT_NG
+"West Babylon 4(2521,UGT001)",CT_FO2
+"Greenidge 4(2527,6)",ST_NG
+"Cayuga 1(2535,1)",ST_BIT
+"Cayuga 2(2535,2)",ST_BIT
+"Bethlehem Energy Center(2539,10001)",CC_NG
+"Bethlehem Energy Center(2539,10002)",CC_NG
+"Bethlehem Energy Center(2539,10003)",CC_NG
+"Oswego 5(2594,5)",ST_FO6
+"Oswego 6(2594,6)",ST_FO6
+"Bowline 1(2625,1)",ST_NG
+"Bowline 2(2625,2)",ST_NG
+"Hillburn GT(2628,001)",CT_NG
+"Shoemaker GT(2632,1)",CT_NG
+"Freeport CT 2(2679,5)",CT_NG
+"Jamestown 7(2682,20)",CT_NG
+"Somerset(6082,1)",ST_BIT
+"Wading River 1(7146,UGT007)",CT_FO2
+"Wading River 2(7146,UGT008)",CT_FO2
+"Wading River 3(7146,UGT009)",CT_FO2
+"Shoreham 1(7146,UGT013)",CT_FO2
+"Shoreham 2(7146,UGT014)",CT_FO2
+"Flynn(7314,001)",CC_NG
+"Glenwood GT 01(7869,UGT011)",CT_FO2
+"Glenwood GT 04(7869,UGT012)",CT_NG
+"Glenwood GT 05(7869,UGT013)",CT_NG
+"Vernon Blvd 2(7909,VB01)",CT_NG
+"Vernon Blvd 3(7909,VB02)",CT_NG
+"Gowanus 5(7910,2301)",CT_NG
+"Gowanus 6(7910,2302)",CT_NG
+"Brentwood(7912,BW01)",CT_NG
+"Hellgate 1(7913,HG01)",CT_NG
+"Hellgate 2(7913,HG02)",CT_NG
+"Harlem River 1(7914,HR01)",CT_NG
+"Harlem River 2(7914,HR02)",CT_NG
+"Kent(7915,NO1)",CT_NG
+"Roseton 1(8006,1)",ST_FO6
+"Roseton 2(8006,2)",ST_FO6
+"Holtsville 01(8007,U00001)",CT_FO2
+"Holtsville 02(8007,U00003)",CT_FO2
+"Holtsville 03(8007,U00005)",CT_FO2
+"Holtsville 04(8007,U00008)",CT_FO2
+"Holtsville 05(8007,U00009)",CT_FO2
+"Holtsville 06(8007,U00011)",CT_FO2
+"Holtsville 07(8007,U00013)",CT_FO2
+"Holtsville 08(8007,U00015)",CT_FO2
+"Holtsville 09(8007,U00017)",CT_FO2
+"Holtsville 10(8007,U00019)",CT_FO2
+"Pouch(8053,PT01)",CT_NG
+"Astoria 2(8906,20)",ST_NG
+"Astoria 3(8906,31RH)",ST_FO6
+"Astoria 3(8906,32SH)",ST_FO6
+"Astoria 5(8906,51RH)",ST_FO6
+"Astoria 5(8906,52SH)",ST_FO6
+"Astoria GT 01(8906,CT0001)",CT_NG
+"Castleton Energy Center(10190,1)",CC_NG
+"Beaver Falls(10617,1)",CC_NG
+"Allegany(10619,00001)",CC_NG
+"Carthage Energy(10620,1)",CC_NG
+"Syracuse(10621,1)",CC_NG
+"Selkirk-I(10725,CTG101)",CC_NG
+"Selkirk-II(10725,CTG201)",CC_NG
+"Selkirk-II(10725,CTG301)",CC_NG
+"Linden Cogen(50006,4001)",CC_NG
+"Linden Cogen(50006,5001)",CC_NG
+"Linden Cogen(50006,6001)",CC_NG
+"Linden Cogen(50006,7001)",CC_NG
+"Linden Cogen(50006,8001)",CC_NG
+"Linden Cogen(50006,9001)",CC_NG
+"Bethpage(50292,GT1)",CC_NG
+"Bethpage(50292,GT2)",CC_NG
+"Bethpage GT4(50292,GT3)",CT_NG
+"Bethpage 3(50292,GT4)",CC_NG
+"Indeck-Silver Springs(50449,1)",CC_NG
+"Indeck-Oswego(50450,1)",CC_NG
+"Indeck-Yerkes(50451,1)",CC_NG
+"Indeck-Corinth(50458,1)",CC_NG
+"Sterling(50744,00001)",CC_NG
+"Carr St.-E. Syr(50978,A)",CC_NG
+"Carr St.-E. Syr(50978,B)",CC_NG
+"Nassau Energy Corp.(52056,00004)",CC_NG
+"Rensselaer(54034,1GTDBS)",CC_NG
+"Lockport(54041,011854)",CC_NG
+"Lockport(54041,011855)",CC_NG
+"Lockport(54041,011856)",CC_NG
+"Indeck-Olean(54076,1)",CC_NG
+"KIAC_JFK_GT1(54114,GT1)",CC_NG
+"KIAC_JFK_GT2(54114,GT2)",CC_NG
+"Fortistar - N.Tonawanda(54131,NTCT1)",CC_NG
+"Stony Brook(54149,1)",CT_NG
+"Independence(54547,1)",CC_NG
+"Independence(54547,2)",CC_NG
+"Independence(54547,3)",CC_NG
+"Independence(54547,4)",CC_NG
+"Saranac Energy(54574,00001)",CC_NG
+"Saranac Energy(54574,00002)",CC_NG
+"Massena(54592,001)",CC_NG
+"Batavia(54593,1)",CC_NG
+"Brooklyn Navy Yard(54914,1)",CC_NG
+"Brooklyn Navy Yard(54914,2)",CC_NG
+"Astoria GT 2-1(55243,CT2-1A)",CT_KER
+"Astoria GT 2-2(55243,CT2-2A)",CT_KER
+"Astoria GT 2-3(55243,CT2-3A)",CT_KER
+"Astoria GT 2-4(55243,CT2-4A)",CT_KER
+"Astoria GT 3-1(55243,CT3-1A)",CT_KER
+"Astoria GT 3-2(55243,CT3-2A)",CT_KER
+"Astoria GT 3-3(55243,CT3-3A)",CT_KER
+"Astoria GT 3-4(55243,CT3-4A)",CT_KER
+"Astoria GT 4-1(55243,CT4-1A)",CT_KER
+"Astoria GT 4-2(55243,CT4-2A)",CT_KER
+"Astoria GT 4-3(55243,CT4-3A)",CT_KER
+"Astoria GT 4-4(55243,CT4-4A)",CT_KER
+"Astoria East Energy - CC1(55375,CT1)",CC_NG
+"Astoria East Energy - CC2(55375,CT2)",CC_NG
+"Astoria Energy 2 - CC3(55375,CT3)",CC_NG
+"Astoria Energy 2 - CC4(55375,CT4)",CC_NG
+"Athens 1(55405,1)",CC_NG
+"Athens 2(55405,2)",CC_NG
+"Athens 3(55405,3)",CC_NG
+"Binghamton(55600,1)",CC_NG
+"Far Rockaway GT1(55699,1)",CT_NG
+"Far Rockaway GT2(55699,2)",CT_KER
+"Pilgrim GT1(55786,CT01)",CT_NG
+"Pilgrim GT2(55786,CT02)",CT_NG
+"Shoreham GT3(55787,CT01)",CT_FO2
+"Shoreham GT4(55787,CT02)",CT_FO2
+"Greenport GT1(55969,U-01)",CT_FO2
+"Freeport CT 1(56032,0001)",CT_NG
+"Pinelawn Power 1(56188,00001)",CC_NG
+"Astoria CC 1(56196,CTG7A)",CC_NG
+"Astoria CC 2(56196,CTG7B)",CC_NG
+"Caithness_CC_1(56234,0001)",CC_NG
+"EMPIRE_CC_1(56259,CT-1)",CC_NG
+"EMPIRE_CC_2(56259,CT-2)",CC_NG
+"Bayonne EC  CTG1(56964,GT1)",CT_NG
+"Bayonne EC  CTG2(56964,GT2)",CT_NG
+"Bayonne EC  CTG3(56964,GT3)",CT_NG
+"Bayonne EC  CTG4(56964,GT4)",CT_NG
+"Bayonne EC  CTG5(56964,GT5)",CT_NG
+"Bayonne EC  CTG6(56964,GT6)",CT_NG
+"Bayonne EC  CTG7(56964,GT7)",CT_NG
+"Bayonne EC  CTG8(56964,GT8)",CT_NG
+Indian Point 2,NU_UR
+Indian Point 3,NU_UR
+James A. FitzPatrick,NU_UR
+Nine Mile Point 1,NU_UR
+Nine Mile Point 2,NU_UR
+R. E. Ginna,NU_UR
+Moses Niagara (Fleet),HY_WAT
+St Lawrence - FDR (Fleet),HY_WAT
+Hydro_B_1,HY_WAT
+Hydro_C_1,HY_WAT
+Hydro_C_2,HY_WAT
+Hydro_D_1,HY_WAT
+Hydro_E_1,HY_WAT
+Hydro_E_2,HY_WAT
+Hydro_F_1,HY_WAT
+Hydro_G_1,HY_WAT
+Import_NE_CSC,Import_Import
+Import_NE_NNC,Import_Import
+Import_NE_ZF,Import_Import
+Import_NE_ZG,Import_Import
+Import_IESO_ZD,Import_Import
+Import_IESO_ZA1,Import_Import
+Import_IESO_ZA2,Import_Import
+Import_PJM_ZA,Import_Import
+Import_PJM_ZC,Import_Import
+Import_PJM_ZG,Import_Import
+Import_PJM_NEPTUNE,Import_Import
+Import_PJM_HTP,Import_Import
+Import_PJM_VFT,Import_Import
+Import_HQ_CEDARS,Import_Import
+Import_HQ_NY,Import_Import
+Bliss Wind Power,WT_WND
+Erie Wind,WT_WND
+Steel Wind,WT_WND
+Western NY Wind Power,WT_WND
+Canandaigua Wind Power,WT_WND
+Fenner Wind Power,WT_WND
+High Sheldon Wind Farm,WT_WND
+Howard Wind,WT_WND
+Marsh Hill Wind Farm,WT_WND
+Orangeville Wind Farm,WT_WND
+Wethersfield Wind Power,WT_WND
+Altona Wind Power,WT_WND
+Chateaugay Wind Power,WT_WND
+Clinton Wind Power,WT_WND
+Ellenburg Wind Power,WT_WND
+Jericho Rise Wind Farm,WT_WND
+Marble River Wind,WT_WND
+Hardscrabble Wind,WT_WND
+Madison Wind Power,WT_WND
+Maple Ridge Wind 1,WT_WND
+Maple Ridge Wind 2,WT_WND
+Munnsville Wind Power,WT_WND
+Long Island Solar Farm,PV_SUN
+Other_A_1,Other_Other
+Other_A_2,Other_Other
+Other_B_1,Other_Other
+Other_C_1,Other_Other
+Other_C_2,Other_Other
+Other_C_3,Other_Other
+Other_C_4,Other_Other
+Other_D_1,Other_Other
+Other_E_1,Other_Other
+Other_E_2,Other_Other
+Other_F_1,Other_Other
+Other_F_2,Other_Other
+Other_F_3,Other_Other
+Other_F_4,Other_Other
+Other_G_1,Other_Other
+Other_H_1,Other_Other
+Other_K_1,Other_Other
+Other_K_2,Other_Other

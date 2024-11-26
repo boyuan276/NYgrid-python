@@ -4,6 +4,7 @@
 ![Python](https://img.shields.io/badge/python-3.8-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.9-blue.svg)
 [![Python package](https://github.com/boyuan276/solar-farm-design/actions/workflows/python-package.yml/badge.svg)](https://github.com/boyuan276/NYgrid-python/actions/workflows/python-package.yml)
+[![CodeQL](https://github.com/boyuan276/NYgrid-python/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/boyuan276/NYgrid-python/actions/workflows/github-code-scanning/codeql)
 
 A python version of the NYgrid model.
 

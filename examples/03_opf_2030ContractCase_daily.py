@@ -83,7 +83,7 @@ if __name__ == '__main__':
                                       dcline_prop_file='dcline_prop_2030ContractCase.csv')
 
     # Read load and generation profiles
-    grid_profile = ng_run.read_grid_profile(grid_data_dir, sim_start_time.year)
+    grid_profile = ng_run.read_grid_profile(grid_data_dir, year=2030)
 
     # %% Modify grid data
 

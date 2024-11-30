@@ -1,10 +1,9 @@
 """
 Run multi-period OPF with 2018 data.
-1. Baseline case:
-No CPNY and CHPE HVDC lines.
-No ESRs.
-No future solar and offshore wind.
-No residential building electrification.
+Case name: 2030ContractCase
+
+Authors:
+- Bo Yuan (Cornell University)
 """
 # %% Packages
 

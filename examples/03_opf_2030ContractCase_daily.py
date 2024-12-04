@@ -27,8 +27,8 @@ if __name__ == '__main__':
     sim_name = f'2030ContractCase_ext{ext_cost_factor}_fo{fo_cost_factor}_daily'
 
     # Simulation time settings
-    valid_days = 30
-    lookahead_days = 1
+    valid_days = 14
+    lookahead_days = 2
 
     valid_hours = 24 * valid_days
     lookahead_hours = 24 * lookahead_days
@@ -146,8 +146,12 @@ if __name__ == '__main__':
     hour_since_last_startup = None
     hour_since_last_shutdown = None
 
+    # Restart from the middle
+    last_cycle_idx = 0
+    # last_cycle_idx = 4
+
     # Loop through all days
-    for d in tqdm(range(len(timestamp_list)), desc='Running OPF'):
+    for d in tqdm(range(last_cycle_idx, len(timestamp_list)), desc='Running OPF'):
         t = time.time()
 
         # Set clycle start and end datetime
@@ -159,18 +163,47 @@ if __name__ == '__main__':
         else:
             cycle_end_time = sim_end_time
 
-        nygrid_results = ng_run.run_nygrid_sim(grid_prop=grid_prop,
-                                               grid_profile=grid_profile,
-                                               start_datetime=cycle_start_time,
-                                               end_datetime=cycle_end_time,
-                                               options=options,
-                                               solver_options=solver_options,
-                                               gen_init=last_gen,
-                                               gen_init_cmt=last_gen_cmt,
-                                               soc_init=last_soc,
-                                               gen_last_startup_hour=hour_since_last_startup,
-                                               gen_last_shutdown_hour=hour_since_last_shutdown,
-                                               verbose=verbose)
+        if cycle_end_time > sim_end_time:
+            cycle_end_time = sim_end_time
+
+        try:
+            nygrid_results = ng_run.run_nygrid_sim(grid_prop=grid_prop,
+                                                   grid_profile=grid_profile,
+                                                   start_datetime=cycle_start_time,
+                                                   end_datetime=cycle_end_time,
+                                                   options=options,
+                                                   solver_options=solver_options,
+                                                   gen_init=last_gen,
+                                                   gen_init_cmt=last_gen_cmt,
+                                                   soc_init=last_soc,
+                                                   gen_last_startup_hour=hour_since_last_startup,
+                                                   gen_last_shutdown_hour=hour_since_last_shutdown,
+                                                   verbose=verbose)
+        except RuntimeError as e:
+            logging.error(f'Error running OPF for {cycle_start_time}.')
+            logging.error(e)
+
+            # Try solving without initial conditions
+            last_gen = np.zeros(grid_prop['gen_prop'].shape[0] +
+                        grid_prop['esr_prop'].shape[0] +
+                        grid_prop['dcline_prop'].shape[0]*2)
+            last_gen_cmt = np.zeros(sum(grid_prop['gen_prop']['CMT_KEY'] == 1))
+            last_soc = None
+            hour_since_last_startup = None
+            hour_since_last_shutdown = None
+
+            nygrid_results = ng_run.run_nygrid_sim(grid_prop=grid_prop,
+                                                   grid_profile=grid_profile,
+                                                   start_datetime=cycle_start_time,
+                                                   end_datetime=cycle_end_time,
+                                                   options=options,
+                                                   solver_options=solver_options,
+                                                   gen_init=last_gen,
+                                                   gen_init_cmt=last_gen_cmt,
+                                                   soc_init=last_soc,
+                                                   gen_last_startup_hour=hour_since_last_startup,
+                                                   gen_last_shutdown_hour=hour_since_last_shutdown,
+                                                   verbose=verbose)
 
         # Save simulation nygrid_results to pickle
         filename = f'nygrid_sim_{sim_name}_{cycle_start_time.strftime("%Y%m%d")}_{valid_days}_{lookahead_days}.pkl'

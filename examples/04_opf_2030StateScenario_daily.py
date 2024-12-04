@@ -27,8 +27,8 @@ if __name__ == '__main__':
     sim_name = f'2030StateScenario_ext{ext_cost_factor}_fo{fo_cost_factor}_daily'
 
     # Simulation time settings
-    valid_days = 30
-    lookahead_days = 1
+    valid_days = 14
+    lookahead_days = 2
 
     valid_hours = 24 * valid_days
     lookahead_hours = 24 * lookahead_days
@@ -146,8 +146,12 @@ if __name__ == '__main__':
     hour_since_last_startup = None
     hour_since_last_shutdown = None
 
+    # Restart from the middle
+    last_cycle_idx = 0
+    # last_cycle_idx = 26
+
     # Loop through all days
-    for d in tqdm(range(len(timestamp_list)), desc='Running OPF'):
+    for d in tqdm(range(last_cycle_idx, len(timestamp_list)), desc='Running OPF'):
         t = time.time()
 
         # Set clycle start and end datetime
@@ -157,6 +161,9 @@ if __name__ == '__main__':
             cycle_end_time = cycle_start_time + \
                 timedelta(hours=valid_hours + lookahead_hours)
         else:
+            cycle_end_time = sim_end_time
+
+        if cycle_end_time > sim_end_time:
             cycle_end_time = sim_end_time
 
         nygrid_results = ng_run.run_nygrid_sim(grid_prop=grid_prop,

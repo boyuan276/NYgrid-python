@@ -1,228 +1,237 @@
-,NYISOName,County
-0,59 St.  GT 1,New York
-1,74 St.  GT 1,New York
-2,74 St.  GT 2,New York
-3,Allegany,Allegany
-4,Allied Frozen Storage,Erie
-5,Arthur Kill Cogen,Richmond
+,NYISO_Name,County
+0,Danskammer 1,Orange
+1,Danskammer 2,Orange
+2,Danskammer 3,Orange
+3,Danskammer 4,Orange
+4,Arthur Kill ST 2,Richmond
+5,Arthur Kill ST 3,Richmond
 6,Arthur Kill GT 1,Richmond
-7,Arthur Kill ST 2,Richmond
-8,Arthur Kill ST 3,Richmond
-9,Astoria 2,Queens
-10,Astoria 3,Queens
-11,Astoria 5,Queens
-12,Astoria CC 1,Queens
-13,Astoria CC 2,Queens
-14,Astoria East Energy - CC1,Queens
-15,Astoria East Energy - CC2,Queens
-16,Astoria Energy 2 - CC3,Queens
-17,Astoria Energy 2 - CC4,Queens
-18,Astoria GT 01,Queens
-19,Astoria GT 2-1,Queens
-20,Astoria GT 2-2,Queens
-21,Astoria GT 2-3,Queens
-22,Astoria GT 2-4,Queens
-23,Astoria GT 3-1,Queens
-24,Astoria GT 3-2,Queens
-25,Astoria GT 3-3,Queens
-26,Astoria GT 3-4,Queens
-27,Astoria GT 4-1,Queens
-28,Astoria GT 4-2,Queens
-29,Astoria GT 4-3,Queens
-30,Astoria GT 4-4,Queens
-31,Athens 1,Greene
-32,Athens 2,Greene
-33,Athens 3,Greene
-34,Barrett 03,Nassau
-35,Barrett 04,Nassau
-36,Barrett 05,Nassau
-37,Barrett 06,Nassau
-38,Barrett 08,Nassau
-39,Barrett 09,Nassau
-40,Barrett 10,Nassau
-41,Barrett 11,Nassau
-42,Barrett 12,Nassau
-43,Barrett GT 01,Nassau
-44,Barrett GT 02,Nassau
-45,Barrett ST 01,Nassau
-46,Barrett ST 02,Nassau
-47,Batavia,Genesee
-48,Beaver Falls,Lewis
-49,Bethlehem Energy Center,Albany
-50,Bethpage,Nassau
-51,Bethpage 3,Nassau
-52,Bethpage GT4,Nassau
-53,Binghamton (RET - 1/9/18),Broome
-54,Bowline 1,Rockland
-55,Bowline 2,Rockland
-56,Brentwood,Suffolk
-57,Brooklyn Navy Yard,Kings
-58,"Burrstone Engy Center, LLC LU",Oneida
-59,"Burrstone Engy Center, LLC U",Oneida
-60,CPV_VALLEY___CC1,Orange
-61,CPV_VALLEY___CC2,Orange
-62,Caithness_CC_1,Suffolk
-63,Carr St.-E. Syr,Onondaga
-64,Carthage Energy,Jefferson
-65,Castleton Energy Center,Rensselaer
-66,Cayuga 1,Tompkins
-67,Charles P Keller 09,Nassau
-68,Charles P Keller 10,Nassau
-69,Charles P Keller 11,Nassau
-70,Charles P Keller 14,Nassau
-71,Coxsackie GT,Greene
-72,Danskammer 1,Orange
-73,Danskammer 2,Orange
-74,Danskammer 3,Orange
-75,Danskammer 4,Orange
-76,EMPIRE_CC_1,Rensselaer
-77,EMPIRE_CC_2,Rensselaer
-78,East Hampton 2,Suffolk
-79,East Hampton 3,Suffolk
-80,East Hampton 4,Suffolk
-81,East Hampton GT 01,Suffolk
-82,East River 1,New York
-83,East River 2,New York
-84,Far Rockaway GT1,Queens
-85,Far Rockaway GT2,Queens
-86,Flynn,Suffolk
-87,Fortistar - N.Tonawanda,Niagara
-88,Freeport 1-4,Nassau
-89,Freeport 2-3,Nassau
-90,Freeport CT 1,Nassau
-91,Freeport CT 2,Nassau
-92,General Mills Inc,Erie
-93,Glenwood GT 02,Nassau
-94,Glenwood GT 03,Nassau
-95,Glenwood GT 04,Nassau
-96,Glenwood GT 05,Nassau
-97,Gowanus 1-1,Kings
-98,Gowanus 1-2,Kings
-99,Gowanus 1-3,Kings
-100,Gowanus 1-4,Kings
-101,Gowanus 1-5,Kings
-102,Gowanus 1-6,Kings
-103,Gowanus 1-7,Kings
-104,Gowanus 2-1,Kings
-105,Gowanus 2-2,Kings
-106,Gowanus 2-3,Kings
-107,Gowanus 2-4,Kings
-108,Gowanus 2-5,Kings
-109,Gowanus 2-6,Kings
-110,Gowanus 2-7,Kings
-111,Gowanus 2-8,Kings
-112,Gowanus 3-1,Kings
-113,Gowanus 3-2,Kings
-114,Gowanus 3-3,Kings
-115,Gowanus 3-4,Kings
-116,Gowanus 3-5,Kings
-117,Gowanus 3-6,Kings
-118,Gowanus 3-7,Kings
-119,Gowanus 3-8,Kings
-120,Gowanus 4-1,Kings
-121,Gowanus 4-2,Kings
-122,Gowanus 4-3,Kings
-123,Gowanus 4-4,Kings
-124,Gowanus 4-5,Kings
-125,Gowanus 4-6,Kings
-126,Gowanus 4-8,Kings
-127,Gowanus 5,Kings
-128,Gowanus 6,Kings
-129,Greenidge 4,Yates
-130,Greenport GT1,Suffolk
-131,Harlem River 1,Bronx
-132,Harlem River 2,Bronx
-133,Hellgate 1,Bronx
-134,Hellgate 2,Bronx
-135,Hillburn GT,Rockland
-136,Holtsville 01,Suffolk
-137,Holtsville 02,Suffolk
-138,Holtsville 03,Suffolk
-139,Holtsville 04,Suffolk
-140,Holtsville 05,Suffolk
-141,Holtsville 06,Suffolk
-142,Holtsville 07,Suffolk
-143,Holtsville 08,Suffolk
-144,Holtsville 09,Suffolk
-145,Holtsville 10,Suffolk
-146,Hudson Ave 3,Kings
-147,Hudson Ave 4,Kings
-148,Hudson Ave 5,Kings
-149,Indeck-Corinth,Saratoga
-150,Indeck-Olean,Cattaraugus
-151,Indeck-Oswego,Oswego
-152,Indeck-Silver Springs,Wyoming
-153,Indeck-Yerkes,Erie
-154,Independence,Oswego
-155,Jamestown 5,Chautauqua
-156,Jamestown 6,Chautauqua
-157,Jamestown 7,Chautauqua
-158,Kent,Kings
-159,KIAC_JFK_GT1,Queens
-160,KIAC_JFK_GT2,Queens
-161,Lockport,Niagara
-162,Massena,St Lawrence
-163,Narrows 1-1,Kings
-164,Narrows 1-2,Kings
-165,Narrows 1-3,Kings
-166,Narrows 1-4,Kings
-167,Narrows 1-5,Kings
-168,Narrows 1-6,Kings
-169,Narrows 1-7,Kings
-170,Narrows 1-8,Kings
-171,Narrows 2-1,Kings
-172,Narrows 2-2,Kings
-173,Narrows 2-3,Kings
-174,Narrows 2-4,Kings
-175,Narrows 2-5,Kings
-176,Narrows 2-6,Kings
-177,Narrows 2-7,Kings
-178,Narrows 2-8,Kings
-179,Nassau Energy Corporation,Nassau
-180,Northport 1,Suffolk
-181,Northport 2,Suffolk
-182,Northport 3,Suffolk
-183,Northport 4,Suffolk
-184,Northport GT,Suffolk
-185,Oswego 5,Oswego
-186,Oswego 6,Oswego
-187,Pilgrim GT1,Suffolk
-188,Pilgrim GT2,Suffolk
-189,Pinelawn Power 1,Suffolk
-190,Port Jefferson 3,Suffolk
-191,Port Jefferson 4,Suffolk
-192,Port Jefferson GT 02,Suffolk
-193,Port Jefferson GT 03,Suffolk
-194,Pouch,Richmond
-195,Ravenswood 01,Queens
-196,Ravenswood 10,Queens
-197,Ravenswood 11,Queens
-198,Ravenswood CC 04,Queens
-199,Ravenswood ST 01,Queens
-200,Ravenswood ST 02,Queens
-201,Ravenswood ST 03,Queens
-202,Rensselaer,Rensselaer
-203,Roseton 1,Orange
-204,Roseton 2,Orange
-205,S Hampton 1,Suffolk
-206,Saranac Energy,Clinton
-207,Selkirk-I,Albany
-208,Selkirk-II,Albany
-209,Shoemaker GT,Orange
-210,Shoreham 1,Suffolk
-211,Shoreham 2,Suffolk
-212,Shoreham GT3,Suffolk
-213,Shoreham GT4,Suffolk
-214,Somerset,Niagara
-215,South Cairo,Greene
-216,Southold 1,Suffolk
-217,St. Elizabeth Medical Center,Oneida
-218,Sterling,Oneida
-219,Stony Brook   (BTM:NG),Suffolk
-220,Syracuse,Onondaga
-221,Vernon Blvd 2,Queens
-222,Vernon Blvd 3,Queens
-223,Wading River 1,Suffolk
-224,Wading River 2,Suffolk
-225,Wading River 3,Suffolk
-226,West Babylon 4,Suffolk
+7,East River 1,New York
+8,East River 2,New York
+9,Gowanus 1-1,Kings
+10,Gowanus 1-2,Kings
+11,Gowanus 1-3,Kings
+12,Gowanus 1-4,Kings
+13,Gowanus 1-5,Kings
+14,Gowanus 1-6,Kings
+15,Gowanus 1-7,Kings
+16,Gowanus 1-8,Kings
+17,Gowanus 2-1,Kings
+18,Gowanus 2-2,Kings
+19,Gowanus 2-3,Kings
+20,Gowanus 2-4,Kings
+21,Gowanus 2-5,Kings
+22,Gowanus 2-6,Kings
+23,Gowanus 2-7,Kings
+24,Gowanus 2-8,Kings
+25,Gowanus 3-1,Kings
+26,Gowanus 3-2,Kings
+27,Gowanus 3-3,Kings
+28,Gowanus 3-4,Kings
+29,Gowanus 3-5,Kings
+30,Gowanus 3-6,Kings
+31,Gowanus 3-7,Kings
+32,Gowanus 3-8,Kings
+33,Gowanus 4-1,Kings
+34,Gowanus 4-2,Kings
+35,Gowanus 4-3,Kings
+36,Gowanus 4-4,Kings
+37,Gowanus 4-5,Kings
+38,Gowanus 4-6,Kings
+39,Gowanus 4-7,Kings
+40,Gowanus 4-8,Kings
+41,Hudson Ave 3,Kings
+42,Hudson Ave 5,Kings
+43,Narrows 1-1,Kings
+44,Narrows 1-2,Kings
+45,Narrows 1-3,Kings
+46,Narrows 1-4,Kings
+47,Narrows 1-5,Kings
+48,Narrows 1-6,Kings
+49,Narrows 1-7,Kings
+50,Narrows 1-8,Kings
+51,Narrows 2-1,Kings
+52,Narrows 2-2,Kings
+53,Narrows 2-3,Kings
+54,Narrows 2-4,Kings
+55,Narrows 2-5,Kings
+56,Narrows 2-6,Kings
+57,Narrows 2-7,Kings
+58,Narrows 2-8,Kings
+59,Ravenswood ST 01,Queens
+60,Ravenswood ST 02,Queens
+61,Ravenswood ST 03,Queens
+62,Ravenswood 01,Queens
+63,Ravenswood 10,Queens
+64,Ravenswood 11,Queens
+65,Ravenswood CC 04,Queens
+66,59 St.  GT 1,New York
+67,74 St.  GT 1,New York
+68,74 St.  GT 2,New York
+69,Barrett ST 01,Nassau
+70,Barrett ST 02,Nassau
+71,Barrett GT 01,Nassau
+72,Barrett GT 02,Nassau
+73,Barrett 03,Nassau
+74,Barrett 04,Nassau
+75,Barrett 05,Nassau
+76,Barrett 06,Nassau
+77,Barrett 08,Nassau
+78,Barrett 09,Nassau
+79,Barrett 10,Nassau
+80,Barrett 11,Nassau
+81,Barrett 12,Nassau
+82,East Hampton GT 01,Suffolk
+83,Glenwood GT 02,Nassau
+84,Glenwood GT 03,Nassau
+85,Northport 1,Suffolk
+86,Northport 2,Suffolk
+87,Northport 3,Suffolk
+88,Northport 4,Suffolk
+89,Northport GT,Suffolk
+90,Port Jefferson 3,Suffolk
+91,Port Jefferson 4,Suffolk
+92,Port Jefferson GT 01,Suffolk
+93,Port Jefferson GT 02,Suffolk
+94,Port Jefferson GT 03,Suffolk
+95,West Babylon 4,Suffolk
+96,Greenidge 4,Yates
+97,Cayuga 1,Tompkins
+98,Cayuga 2,Tompkins
+99,Bethlehem Energy Center,Albany
+100,Bethlehem Energy Center,Albany
+101,Bethlehem Energy Center,Albany
+102,Oswego 5,Oswego
+103,Oswego 6,Oswego
+104,Bowline 1,Rockland
+105,Bowline 2,Rockland
+106,Hillburn GT,Rockland
+107,Shoemaker GT,Orange
+108,Freeport CT 2,Nassau
+109,Jamestown 7,Chautauqua
+110,Somerset,Niagara
+111,Wading River 1,Suffolk
+112,Wading River 2,Suffolk
+113,Wading River 3,Suffolk
+114,Shoreham 1,Suffolk
+115,Shoreham 2,Suffolk
+116,Flynn,Suffolk
+117,Glenwood GT 01,Nassau
+118,Glenwood GT 04,Nassau
+119,Glenwood GT 05,Nassau
+120,Vernon Blvd 2,Queens
+121,Vernon Blvd 3,Queens
+122,Gowanus 5,Kings
+123,Gowanus 6,Kings
+124,Brentwood,Suffolk
+125,Hellgate 1,Bronx
+126,Hellgate 2,Bronx
+127,Harlem River 1,Bronx
+128,Harlem River 2,Bronx
+129,Kent,Kings
+130,Roseton 1,Orange
+131,Roseton 2,Orange
+132,Holtsville 01,Suffolk
+133,Holtsville 02,Suffolk
+134,Holtsville 03,Suffolk
+135,Holtsville 04,Suffolk
+136,Holtsville 05,Suffolk
+137,Holtsville 06,Suffolk
+138,Holtsville 07,Suffolk
+139,Holtsville 08,Suffolk
+140,Holtsville 09,Suffolk
+141,Holtsville 10,Suffolk
+142,Pouch,Richmond
+143,Astoria 2,Queens
+144,Astoria 3,Queens
+145,Astoria 3,Queens
+146,Astoria 5,Queens
+147,Astoria 5,Queens
+148,Astoria GT 01,
+149,Castleton Energy Center,Rensselaer
+150,Beaver Falls,Lewis
+151,Allegany,Allegany
+152,Carthage Energy,Jefferson
+153,Syracuse,Onondaga
+154,Selkirk-I,Albany
+155,Selkirk-II,Albany
+156,Selkirk-II,Albany
+157,Linden Cogen,
+158,Linden Cogen,
+159,Linden Cogen,
+160,Linden Cogen,
+161,Linden Cogen,
+162,Linden Cogen,
+163,Bethpage,Nassau
+164,Bethpage,Nassau
+165,Bethpage GT4,Nassau
+166,Bethpage 3,Nassau
+167,Indeck-Silver Springs,Wyoming
+168,Indeck-Oswego,Oswego
+169,Indeck-Yerkes,Erie
+170,Indeck-Corinth,Saratoga
+171,Sterling,Oneida
+172,Carr St.-E. Syr,Onondaga
+173,Carr St.-E. Syr,Onondaga
+174,Nassau Energy Corp.,Nassau
+175,Rensselaer,Rensselaer
+176,Lockport,Niagara
+177,Lockport,Niagara
+178,Lockport,Niagara
+179,Indeck-Olean,Cattaraugus
+180,KIAC_JFK_GT1,Queens
+181,KIAC_JFK_GT2,Queens
+182,Fortistar - N.Tonawanda,Niagara
+183,Stony Brook,Suffolk
+184,Independence,Oswego
+185,Independence,Oswego
+186,Independence,Oswego
+187,Independence,Oswego
+188,Saranac Energy,Clinton
+189,Saranac Energy,Clinton
+190,Massena,St Lawrence
+191,Batavia,Genesee
+192,Brooklyn Navy Yard,Kings
+193,Brooklyn Navy Yard,Kings
+194,Astoria GT 2-1,Queens
+195,Astoria GT 2-2,Queens
+196,Astoria GT 2-3,Queens
+197,Astoria GT 2-4,Queens
+198,Astoria GT 3-1,Queens
+199,Astoria GT 3-2,Queens
+200,Astoria GT 3-3,Queens
+201,Astoria GT 3-4,Queens
+202,Astoria GT 4-1,Queens
+203,Astoria GT 4-2,Queens
+204,Astoria GT 4-3,Queens
+205,Astoria GT 4-4,Queens
+206,Astoria East Energy - CC1,Queens
+207,Astoria East Energy - CC2,Queens
+208,Astoria Energy 2 - CC3,Queens
+209,Astoria Energy 2 - CC4,Queens
+210,Athens 1,Greene
+211,Athens 2,Greene
+212,Athens 3,Greene
+213,Binghamton,Broome
+214,Far Rockaway GT1,Queens
+215,Far Rockaway GT2,
+216,Pilgrim GT1,Suffolk
+217,Pilgrim GT2,Suffolk
+218,Shoreham GT3,Suffolk
+219,Shoreham GT4,Suffolk
+220,Greenport GT1,Suffolk
+221,Freeport CT 1,Nassau
+222,Pinelawn Power 1,Suffolk
+223,Astoria CC 1,Queens
+224,Astoria CC 2,Queens
+225,Caithness_CC_1,Suffolk
+226,EMPIRE_CC_1,Rensselaer
+227,EMPIRE_CC_2,Rensselaer
+228,Bayonne EC  CTG1,
+229,Bayonne EC  CTG2,
+230,Bayonne EC  CTG3,
+231,Bayonne EC  CTG4,
+232,Bayonne EC  CTG5,
+233,Bayonne EC  CTG6,
+234,Bayonne EC  CTG7,
+235,Bayonne EC  CTG8,

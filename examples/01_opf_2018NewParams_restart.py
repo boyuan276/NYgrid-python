@@ -170,6 +170,9 @@ if __name__ == '__main__':
         else:
             cycle_end_time = sim_end_time
 
+        if cycle_end_time > sim_end_time:
+            cycle_end_time = sim_end_time
+
         nygrid_results = ng_run.run_nygrid_sim(grid_prop=grid_prop,
                                                grid_profile=grid_profile,
                                                start_datetime=cycle_start_time,

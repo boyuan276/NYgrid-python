@@ -50,6 +50,37 @@ MIN_DOWN_TIME = {
     "Load": {"Load": 0} # Load
 }
 
+FAILURE_PROB = {
+    "CC": {"NG": 0.002193},
+    "CT": {"NG": 0.002193, "FO2": 0.002193, "KER": 0.002193},
+    "ST": {"NG": 0.002193, "FO6": 0.002193, "BIT": 0.002193},
+    "NU": {"UR": 0.001289}, # Nuclear
+    "HY": {"WAT": 0.000505}, # Hydro
+    "Import": {"Import": 0.0},
+    "WT": {"WND": 0.0}, # Wind
+    "PV": {"SUN": 0.0}, # Solar
+    "PS": {"WAT": 0.0}, # Pumped storage
+    "ES": {"BAT": 0.0}, # Battery
+    "Other": {"Other": 0.0}, # Other renewable
+    "Load": {"Load": 0.0} # Load
+}
+
+
+REPAIR_PROB = {
+    "CC": {"NG": 0.030303},
+    "CT": {"NG": 0.032258, "FO2": 0.032258, "KER": 0.032258},
+    "ST": {"NG": 0.016667, "FO6": 0.016667, "BIT": 0.016667},
+    "NU": {"UR": 0.006667}, # Nuclear
+    "HY": {"WAT": 0.10000}, # Hydro
+    "Import": {"Import": 1.0},
+    "WT": {"WND": 1.0}, # Wind
+    "PV": {"SUN": 1.0}, # Solar
+    "PS": {"WAT": 1.0}, # Pumped storage
+    "ES": {"BAT": 1.0}, # Battery
+    "Other": {"Other": 1.0}, # Other renewable
+    "Load": {"Load": 1.0} # Load
+}
+
 
 def calc_heat_rate(data, gen_info, x_name, y_name,
                    calc_eco_min=False,

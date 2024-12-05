@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nygrid"
+version = "0.1.0"  # Update this to match your version
+description = "A python version of the NYgrid model"
+readme = "README.md"  # Adjust if your README file is named differently
+license = {text = "MIT License"}
+authors = [
+    {name = "The NYgrid-python Developers", email = "by276@cornell.edu"}
+]
+maintainers = [
+    {name = "Bo Yuan", email = "by276@cornell.edu"}
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "Programming Language :: Python :: 3 :: Only",
+]
+keywords = ["Power system", "Renewable energy", "Optimization"]
+dependencies = [
+    "numpy",
+    "scipy",
+    "pandas",
+    "pyomo",
+    "pypower",
+    "matplotlib",
+    "openpyxl"
+]
+requires-python = ">=3.7"
+urls = {homepage = "https://github.com/boyuan276/NYgrid-python"}
+
+[tool.setuptools]
+packages = ["nygrid"]  # If your package is a directory named nygrid
+
+[project.optional-dependencies]
+dev = ["pytest", "black"]

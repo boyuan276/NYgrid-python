@@ -23,9 +23,7 @@ CLASSIFIERS = [
 PLATFORMS = "Any"
 PACKAGES = find_packages()
 SCRIPTS = []
-PACKAGE_DATA = {
-    # "cmaqpy": ["cmaqpy/data/*"],
-}
+PACKAGE_DATA = {}
 INSTALL_REQUIRES = [
     "numpy",
     "scipy",

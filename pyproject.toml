@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nygrid"
-version = "0.1.0"  # Update this to match your version
+version = "0.1.1"  # Update this to match your version
 description = "A python version of the NYgrid model"
 readme = "README.md"  # Adjust if your README file is named differently
 license = {text = "MIT License"}

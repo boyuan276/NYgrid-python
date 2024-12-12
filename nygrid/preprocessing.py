@@ -6,8 +6,24 @@ Last modified: 2023-12-26, by Bo Yuan (Cornell University)
 """
 
 import os
+import numpy as np
 import pandas as pd
 from typing import List, Tuple, Optional
+
+
+ZONE_NAME2ID = {
+    'WEST': 'A', 
+    'GENESEE': 'B', 
+    'CENTRAL': 'C', 
+    'NORTH': 'D',
+    'MOHAWK VALLEY': 'E', 
+    'CAPITAL': 'F', 
+    'HUDSON VALLEY': 'G',
+    'MILLWOOD': 'H', 
+    'DUNWOODIE': 'I', 
+    'NYC': 'J', 
+    'L ISLAND': 'K'
+}
 
 
 def agg_demand_county2bus(demand_inc_county: pd.DataFrame,
@@ -141,3 +157,70 @@ def get_building_load_change_county(county_id: str,
     df_county_saving = df_county_saving.rename(columns=col_rename)
 
     return df_county_base, df_county_future, df_county_saving
+
+
+def add_load_weighted(hourly_load_zonal: pd.DataFrame, 
+                      bus_info: pd.DataFrame,
+                      ) -> pd.DataFrame:
+    
+    """
+    Distribute zonal load to individual buses based on load distribution ratio.
+
+    Parameters
+    ----------
+    hourly_load_zonal : pd.DataFrame
+        Zonal load timeseries
+    bus_info : pd.DataFrame
+        Bus information
+
+    Returns
+    -------
+    bus_wload : pd.DataFrame
+        Bus-level load timeseries
+    """
+    
+    # Subset of bus in NY control area
+    nys_bus = bus_info[~bus_info['zone'].isnull()]
+    # Subset of bus with load
+    nys_bus_wload = nys_bus[nys_bus['sumLoadP0'] > 0]
+
+    # Load bus and ratio calculation
+    zone_ids = nys_bus['zone'].unique()
+    load_bus_zone = np.empty(11, dtype=object)
+    load_ratio_zone = np.empty(11, dtype=object)
+    num_load_bus_zone = np.zeros(11, dtype=int)
+
+    # Calculate zonal load distribution ratio
+    for i, zone_id in enumerate(zone_ids):
+        load_bus_table = nys_bus_wload[nys_bus_wload['zone'] == zone_id]
+        load_bus_zone[i] = load_bus_table['idx'].values
+        if load_bus_table.shape[0] > 0:
+            load_ratio_zone[i] = (load_bus_table['sumLoadP0'] /
+                                load_bus_table['sumLoadP0'].sum()).values
+        else:
+            load_bus_zone[i] = nys_bus[nys_bus['zone'] == zone_id]['idx'].values
+            load_ratio_zone[i] = np.ones(
+                len(load_bus_zone[i])) / len(load_bus_zone[i])
+        num_load_bus_zone[i] = len(load_bus_zone[i])
+
+    num_load_bus_tot = sum(num_load_bus_zone)
+    
+    # Distribute zonal load to individual buses
+    num_hours = hourly_load_zonal.shape[0]
+    zone_load_bus = np.empty(len(zone_ids), dtype=object)
+    load_bus_idx = np.zeros(num_load_bus_tot)
+    load_bus_load = np.zeros((num_load_bus_tot, num_hours))
+    n = 0
+    for i, zone_id in enumerate(zone_ids):
+        zone_load_tot = hourly_load_zonal[zone_id].values
+        zone_load_bus[i] = np.outer(load_ratio_zone[i], zone_load_tot)
+        load_bus_idx[n:n+num_load_bus_zone[i]] = load_bus_zone[i]
+        load_bus_load[n:n+num_load_bus_zone[i], :] = zone_load_bus[i]
+        n += num_load_bus_zone[i]
+
+    bus_wload = pd.DataFrame(load_bus_load.T, columns=load_bus_idx,
+                             index=hourly_load_zonal.index)
+    bus_wload = bus_wload.sort_index(axis=1)
+    bus_wload.columns = bus_wload.columns.astype(int)
+
+    return bus_wload

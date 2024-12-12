@@ -4,6 +4,7 @@ Build and install the project.
 from setuptools import setup, find_packages
 
 NAME = "nygrid"
+VERSION = "0.1.1"
 FULLNAME = "NYgrid Python Tools"
 AUTHOR = "The NYgrid-python Developers"
 AUTHOR_EMAIL = "by276@cornell.edu"
@@ -38,6 +39,7 @@ PYTHON_REQUIRES = ">=3.7"
 if __name__ == "__main__":
     setup(
         name=NAME,
+        version=VERSION,
         fullname=FULLNAME,
         description=DESCRIPTION,
         author=AUTHOR,

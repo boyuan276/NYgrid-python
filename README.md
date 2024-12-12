@@ -48,26 +48,32 @@ conda activate NYgrid-python
 
     - Go to the `examples` folder.
 
-    - Run the model with default parameters:
+    - Run the base year 2018 case:
 
         ```bash
-        python ex_opf_wo_renew.py
+        python 01_opf_2018NewParams_daily.py
         ```
 
-    - Run the model with renewable integration:
+    - Run the future year 2030 with policy scenarios:
 
         ```bash
-        # With future distributed solar integration
-        python ex_opf_w_future_solar.py
+        # 1) 2030BaselineCase
+        python 02_opf_2030BaselineCase_daily.py
 
-        # With offshore wind integration
-        python ex_opf_w_offshore_wind.py
+        # 2) 2030ContractCase
+        python 03_opf_2030ContractCase_daily.py
 
-        # With solar, offshore wind, and building electrification integration
-        python ex_opf_w_renew.py
+        # 3) 2030StateScenario
+        python 04_opf_2030StateScenario_daily.py
         ```
 
-Note: Renewable timeseries data need to be prepared before running the model.
+    - Note: Generation and load properties and profiles need to be prepared before running these cases.
+
+## Data
+
+1. Generation data: See `examples/write_gen_prop_profiles_{case_name}.ipynb`.
+
+2. Load data: See `examples/write_load_profiles_{case_name}.ipynb`.
 
 
 ## See also

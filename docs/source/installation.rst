@@ -1,6 +1,15 @@
 Installation
 ============
 
+Install using pip
+-----------------
+
+The ``nygrid`` package can be installed using pip::
+pip install nygrid
+
+Install from source
+-------------------
+
 1. Install `Anaconda <https://www.anaconda.com/download/>`_.
 
 2. Install `Git <https://git-scm.com/downloads>`_.

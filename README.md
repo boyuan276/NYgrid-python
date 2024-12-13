@@ -15,22 +15,41 @@ It contains the following components:
 * Battery storage
 * Electric vehicle (EV) charging
 
+## Documentation
+
+Full documentation can be found at [readthedocs](https://nygrid-python.readthedocs.io/en/latest/).
+
 ## Installation
 
+### Install using pip
+
+The ``nygrid`` package can be installed using PIP.
+
+```bash
+pip install nygrid
+```
+
+### Install from the source
+
 1. Install [Anaconda](https://www.anaconda.com/download/).
+
 2. Install [Git](https://git-scm.com/downloads).
+
 3. Clone the repository: 
 ```bash
 git clone https://github.com/boyuan276/NYgrid-python.git
 ```
+
 4. Create a conda environment:
 ```bash
 conda env create -f NYgrid-python.yml
 ```
+
 5. Activate the environment:
 ```bash
 conda activate NYgrid-python
 ```
+
 6. Install the package:
 ```bash
 pip install -e .
@@ -74,6 +93,10 @@ conda activate NYgrid-python
 1. Generation data: See `examples/write_gen_prop_profiles_{case_name}.ipynb`.
 
 2. Load data: See `examples/write_load_profiles_{case_name}.ipynb`.
+
+## License
+
+MIT license.
 
 
 ## See also

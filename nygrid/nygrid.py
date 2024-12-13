@@ -29,7 +29,7 @@ def check_status(results: SolverResults) -> bool:
 
     Parameters
     ----------
-    results: pyomo.opt.results.results_.SolverResults
+    results: ``pyomo.opt.results.results_.SolverResults``
         Pyomo model results.
 
     Returns
@@ -285,6 +285,195 @@ class NYGrid:
     """
     Class for running the NYGrid model.
 
+    Attributes
+    ----------
+    Basic attributes:
+        grid_prop: dict
+            Grid properties.
+        start_datetime: pandas.Timestamp
+            Start datetime of the simulation.
+        end_datetime: pandas.Timestamp
+            End datetime of the simulation.
+        verbose: bool
+            If True, print out the information of the simulation.
+        ppc: dict
+            PyPower case dictionary.
+        ppc_int: dict
+            PyPower case dictionary with internal indexing.
+        baseMVA: float
+            Base MVA.
+        bus: numpy.ndarray
+            Bus matrix.
+        gen: numpy.ndarray
+            Generator matrix.
+        branch: numpy.ndarray
+            Branch matrix.
+        gencost: numpy.ndarray
+            Generator cost matrix.
+        PTDF: numpy.ndarray
+            Power Transfer Distribution Factors.
+    
+    Attributes for dimension and indexing
+        NG: int
+            Number of generators.
+        NB: int
+            Number of buses.
+        NBR: int
+            Number of branches.
+        NL: int
+            Number of loads.
+        gen_bus: numpy.ndarray
+            Generator's bus location.
+        B: numpy.ndarray
+            Full B matrix.
+        Bf: numpy.ndarray
+            Full Bf matrix.
+        gen_map: numpy.ndarray
+            Mapping from generator to bus.
+        gen_i2e: numpy.ndarray
+            Index for converting external to internal indexing.
+        gen_idx_non_cvt: numpy.ndarray
+            Index of non-converter generators.
+        dcline_idx_f: numpy.ndarray
+            Index of DC line converted generators at FROM bus.
+        dcline_idx_t: numpy.ndarray
+            Index of DC line converted generators at TO bus.
+        esr_idx: numpy.ndarray
+            Index of ESR converted generators.
+        vre_idx: numpy.ndarray
+            Index of VRE converted generators.
+        gen_idx_offline: numpy.ndarray
+            Index of offline generators.
+        NG_offline: int
+            Number of offline generators.
+        gen_idx_avail: numpy.ndarray
+            Index of available generators.
+        NG_avail: int
+            Number of available generators.
+        gen_idx_mustrun: numpy.ndarray
+            Index of must run generators.
+        NG_mustrun: int
+            Number of must run generators.
+    
+    Attributes for constraints
+        min_up_time: numpy.ndarray
+            Generator min up time.
+        min_down_time: numpy.ndarray
+            Generator min down time.
+        load_map: numpy.ndarray
+            Mapping from load to bus.
+        load_bus: numpy.ndarray
+            Load bus location.
+        load_pu: numpy.ndarray
+            Load in p.u.
+        br_max: numpy.ndarray
+            Line flow upper limit in p.u.
+        br_min: numpy.ndarray
+            Line flow lower limit in p.u.
+        if_map: numpy.ndarray
+            Interface mapping.
+        if_lims: numpy.ndarray
+            Interface limits.
+        if_br_dir: numpy.ndarray
+            Interface branch direction.
+        if_br_idx: numpy.ndarray
+            Interface branch index.
+        if_lims_max: numpy.ndarray
+            Interface limits maximum.
+        if_lims_min: numpy.ndarray
+            Interface limits minimum.
+        NIF: int
+            Number of interfaces.
+        gen_hist: numpy.ndarray
+            Historical generation data.
+        gen_max: numpy.ndarray
+            Generator upper operating limit in p.u.
+        gen_min: numpy.ndarray
+            Generator lower operating limit in p.u.
+        ramp_up: numpy.ndarray
+            Generator ramp up limit in p.u./hour.
+        ramp_down: numpy.ndarray
+            Generator ramp down limit in p.u./hour.
+        gencost_0: numpy.ndarray
+            Generator linear cost intercept in p.u.
+        gencost_1: numpy.ndarray
+            Generator linear cost slope in p.u.
+        gencost_startup: numpy.ndarray
+            Generator startup cost in p.u.
+        gencost_shutdown: numpy.ndarray
+            Generator shutdown cost in p.u.
+        gen_init: numpy.ndarray
+            Generator initial condition.
+        gen_init_cmt: numpy.ndarray
+            Generator initial unit commitment.
+        gen_last_startup_hour: numpy.ndarray
+            Generator last startup hour.
+        gen_last_shutdown_hour: numpy.ndarray
+            Generator last shutdown hour.
+        esr_crg_max: numpy.ndarray
+            ESR charging power upper limit in p.u.
+        esr_dis_max: numpy.ndarray
+            ESR discharging power upper limit in p.u.
+        esr_crg_eff: numpy.ndarray
+            ESR charging efficiency.
+        esr_dis_eff: numpy.ndarray
+            ESR discharging efficiency.
+        esr_soc_max: numpy.ndarray
+            ESR SOC upper limit in p.u.
+        esr_soc_min: numpy.ndarray
+            ESR SOC lower limit in p.u.
+        esr_init: numpy.ndarray
+            ESR SOC initial condition in p.u.
+        esr_target: numpy.ndarray
+            ESR SOC target condition in p.u.
+        esrcost_crg: numpy.ndarray
+            ESR charging cost.
+        esrcost_dis: numpy.ndarray
+            ESR discharging cost.
+    
+    Attributes for optimization
+        UsePTDF: bool
+            Use Power Transfer Distribution Factors (PTDF) for linear shift factor.
+        solver: str
+            Solver name. Default is 'gurobi'.
+        NoPowerBalanceViolation: bool
+            No power balance violation. Default is False.
+        NoRampViolation: bool
+            No ramp violation. Default is False.
+        PenaltyForOverGeneration: float
+            Penalty for over generation. Default is 1_500 $/MWh.
+        PenaltyForLoadShed: float
+            Penalty for load shed. Default is 5_000 $/MWh.
+        PenaltyForRampViolation: float
+            Penalty for ramp violation. Default is 11_000 $/MW.
+        PenaltyForMinTimeViolation: float
+            Penalty for minimum time violation. Default is 1_000 $/MWh.
+        PenaltyForNumberCommitViolation: float
+            Penalty for number of commitment violation. Default is 10_000 $/hour.
+        NoReserveViolation: bool
+            No reserve violation. Default is False.
+        PenaltyForReserveViolation: float
+            Penalty for reserve violation. Default is 1_300 $/MW.
+        NoImplicitReserveCascading: bool
+            No implicit reserve cascading. Default is False.
+        OfflineReserveNotFromOnline: bool
+            Offline reserve not from online. Default is False.
+        NoPowerflowViolation: bool
+            No power flow violation. Default is False.
+        HvdcHurdleCost: float
+            HVDC hurdle cost. Default is 0.10 $/MWh. Not used.
+        PenaltyForBranchMwViolation: float
+            Penalty for branch MW violation. Default is 1_000 $/MWh.
+        PenaltyForInterfaceMWViolation: float
+            Penalty for interface MW violation. Default is 1_000 $/MWh.
+        MaxPhaseAngleDifference: float
+            Maximum phase angle difference. Default is 1.5.
+        PenaltyForESRPowerViolation: float
+            Penalty for ESR power violation. Default is 8_000 $/MWh.
+        PenaltyForESRSOCLimitViolation: float
+            Penalty for ESR SOC limit violation. Default is 8_000 $/MWh.
+        PenaltyForESRSOCTargetViolation: float
+            Penalty for ESR SOC target violation. Default is 5_000 $/MWh.
     """
 
     def __init__(self,

@@ -51,9 +51,11 @@ def read_grid_prop(grid_data_dir: Union[str, os.PathLike],
     -------
     grid_data: dict
         Dictionary of grid data.
-        Keys: bus_prop, gen_prop, gen_fuel, gencost_prop, 
-              branch_prop, if_lim_prop, if_map_prop, 
-              esr_prop, dcline_prop
+
+        Keys: ``bus_prop``, ``gen_prop``, ``gen_fuel``, ``gencost_prop``, 
+        ``branch_prop``, ``if_lim_prop``, ``if_map_prop``, 
+        ``esr_prop``, ``dcline_prop``
+        
         Values: pandas.DataFrame
     """
 
@@ -145,7 +147,7 @@ def read_grid_prop(grid_data_dir: Union[str, os.PathLike],
 def read_grid_profile(data_dir: Union[str, os.PathLike],
                       year: int) -> Dict[str, pd.DataFrame]:
     """
-    Read grid data
+    Read grid profile data from csv files.
 
     Parameters
     ----------
@@ -158,9 +160,10 @@ def read_grid_profile(data_dir: Union[str, os.PathLike],
     -------
     grid_data : dict
         Dictionary of grid data
-        Keys: 'load_profile', 'gen_profile', 'genmax_profile', 'genmin_profile', 'genramp30_profile',
-                'gencost0_profile', 'gencost1_profile'
-        Values: pandas.DataFrame
+        The following keys are accepted: ``load_profile``, ``gen_profile``, 
+        ``genmax_profile``, ``genmin_profile``, ``genramp30_profile``, 
+        ``gencost0_profile``, ``gencost1_profile``
+        The dictionary values are pandas.DataFrame
     """
 
     # Read load profile
@@ -398,6 +401,24 @@ def read_com_building_elec_data(data_dir: Union[str, os.PathLike],
                                 upgrade_id: int,
                                 county_attrs: pd.DataFrame,
                                 ) -> pd.DataFrame:
+    
+    """
+    Commercial building energy changes due to electrification.
+
+    Parameters
+    ----------
+    data_dir : str
+        Directory of commercial building data
+    upgrade_id : int
+        Commercial building upgrade scenario ID
+    county_attrs : pd.DataFrame
+        County attributes
+
+    Returns
+    -------
+    com_load_change_county : pd.DataFrame
+        Commercial building load change by county
+    """
 
     # Directory for processed data output
     com_bldg_proc_dir = os.path.join(data_dir,
@@ -504,15 +525,16 @@ def read_electrification_data(electrification_dict: Dict[str, Any],
                               county_2_bus: pd.DataFrame
                               ) -> Dict[str, Any]:
     """
+    Read electrification data for different
+    sectors (residential building, commercial building, electric vehicle)
 
     Parameters
     ----------
     electrification_dict : dict
         Dictionary of electrification data
         Keys: 'res_building', 'com_building', 'electric_vehicle'
-        In each dictionary, the following keys are required:
-            'data_dir': str
-            'upgrade_id': int
+        In each dictionary, the following keys are required: ``data_dir`` (str), 
+        ``upgrade_id`` (int)
     county_attrs : pd.DataFrame
         County attributes
     county_2_bus : pd.DataFrame
@@ -523,10 +545,8 @@ def read_electrification_data(electrification_dict: Dict[str, Any],
     electrification_dict : dict
         Dictionary of electrification data
         Keys: 'res_building', 'com_building', 'electric_vehicle'
-        In each dictionary, the following keys are required:
-            'data_dir': str
-            'upgrade_id': int
-            'load_change': pd.DataFrame
+        In each dictionary, the following keys are required: ``data_dir`` (str), 
+        ``upgrade_id`` (int), ``load_change`` (pd.DataFrame)
     """
 
     print(f"Get electrification data for {len(electrification_dict)} sectors:")
@@ -574,12 +594,18 @@ def run_nygrid_sim(grid_prop: Dict[str, pd.DataFrame],
     ----------
     grid_prop : dict
         Dictionary of grid properties
-        Keys: bus_prop, gen_prop, gen_fuel, gencost_prop, branch_prop, if_lim_prop, if_map_prop
+
+        Keys: ``bus_prop``, ``gen_prop``, ``gen_fuel``, ``gencost_prop``, 
+        ``branch_prop``, ``if_lim_prop``, ``if_map_prop``
+
         Values: pandas.DataFrame
     grid_profile : dict
         Dictionary of grid profiles
-        Keys: load_profile, gen_profile, genmax_profile, genmin_profile, genramp30_profile,
-              gencost0_profile, gencost1_profile
+        
+        Keys: ``load_profile``, ``gen_profile``, ``genmax_profile``, 
+        ``genmin_profile``, ``genramp30_profile``, ``gencost0_profile``, 
+        ``gencost1_profile``
+        
         Values: pandas.DataFrame
     start_datetime : pd.Timestamp
         Start datetime of simulation

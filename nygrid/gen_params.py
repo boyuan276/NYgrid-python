@@ -86,6 +86,46 @@ def calc_heat_rate(data, gen_info, x_name, y_name,
                    calc_eco_min=False,
                    nonneg_intercept=True,
                    keep_in_range=True):
+    
+    """
+    Calculate heat rate using linear regression and plot the data.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Dataframe with columns x_name and y_name.
+    gen_info : pd.Series
+        Series with information about the generator.
+    x_name : str
+        Name of the column for the independent variable.
+    y_name : str
+        Name of the column for the dependent variable.
+    calc_eco_min : bool, optional
+        Calculate eco-min based on the heat rate, by default False.
+    nonneg_intercept : bool, optional
+        Ensure that the intercept is non-negative, by default True.
+    keep_in_range : bool, optional
+        Ensure that the heat rate is within the range, by default True.
+
+    Returns
+    -------
+    slope : float
+        Slope of the linear regression.
+    intercept : float
+        Intercept of the linear regression.
+    r2 : float
+        R-squared value of the linear regression.
+    eco_min : float
+        Eco-min value.
+    gen_sum : float
+        Total generation.
+    heat_input_sum : float
+        Total heat input.
+    fig : plt.Figure
+        Figure object.
+    axs : np.ndarray
+        Axes objects.
+    """
 
     # Calculate total generation and heat input
     gen_sum = data[x_name].sum()
@@ -231,6 +271,44 @@ def calc_heat_rate(data, gen_info, x_name, y_name,
 def calc_emis_rate(data, gen_info, x_name, y_name, rate_name,
                    gload_name='GLOAD (MW)',
                    heat_input_name='HEAT_INPUT (mmBtu)'):
+    
+    """
+    Calculate emission rate using linear regression and plot the data.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Dataframe with columns x_name and y_name.
+    gen_info : pd.Series
+        Series with information about the generator.
+    x_name : str
+        Name of the column for the independent variable.
+    y_name : str
+        Name of the column for the dependent variable.
+    rate_name : str
+        Name of the column for the emission rate.
+    gload_name : str, optional
+        Name of the column for the generation load, by default 'GLOAD (MW)'.
+    heat_input_name : str, optional
+        Name of the column for the heat input, by default 'HEAT_INPUT (mmBtu)'.
+
+    Returns
+    -------
+    slope : float
+        Slope of the linear regression.
+    intercept : float
+        Intercept of the linear regression.
+    r2 : float
+        R-squared value of the linear regression.
+    avg_rate : float
+        Average emission rate.
+    emis_sum : float
+        Total emissions.
+    fig : plt.Figure
+        Figure object.
+    ax : plt.Axes
+        Axes object.
+    """
 
     # Check if all data is NaN
     if data[y_name].isnull().all():
@@ -285,6 +363,22 @@ def calc_emis_rate(data, gen_info, x_name, y_name, rate_name,
 
 
 def calc_eco_min_ratio(heat_rate, unit_type):
+    """
+    Calculate eco-min ratio based on the heat rate and unit type.
+
+    Parameters
+    ----------
+    heat_rate : float
+        Heat rate in mmBtu/MWh.
+    unit_type : str
+        Unit type (CC, CT, ST).
+
+    Returns
+    -------
+    eco_min : float
+        Eco-min ratio.
+    """
+
     if unit_type == 'CC':
         if heat_rate <= 6:
             eco_min = 0.47
@@ -348,6 +442,21 @@ def calc_eco_min_ratio(heat_rate, unit_type):
 
 
 def format_gen_prop_thermal(gen_params):
+    """
+    Format generator properties for thermal units.
+
+    Parameters
+    ----------
+    gen_params : pd.DataFrame
+        Dataframe with generator parameters.
+
+    Returns
+    -------
+    gen_prop : pd.DataFrame
+        Dataframe with generator properties.
+    
+    """
+
     gen_prop = pd.DataFrame(index=gen_params.index)
     gen_prop['GEN_NAME'] = gen_params['NYISO_Name'] + \
         gen_params['ID']
@@ -385,6 +494,21 @@ def format_gen_prop_thermal(gen_params):
 
 
 def format_gen_prop_non_thermal(gen_params):
+    """
+    Format generator properties for non-thermal units.
+
+    Parameters
+    ----------
+    gen_params : pd.DataFrame
+        Dataframe with generator parameters.
+
+    Returns
+    -------
+    gen_prop : pd.DataFrame
+        Dataframe with generator properties.   
+    
+    """
+
     gen_prop = pd.DataFrame(index=gen_params.index)
     gen_prop['GEN_NAME'] = gen_params['Name']
     gen_prop['GEN_BUS'] = gen_params['gen_bus']

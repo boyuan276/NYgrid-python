@@ -29,6 +29,8 @@ extensions = [
     'sphinx.ext.napoleon',    # Support for Google/NumPy style docstrings
     'sphinx.ext.viewcode',    # Add links to source code
     'sphinx_rtd_theme',       # ReadTheDocs theme
+    'sphinx.ext.autosummary', # Generate autodoc summaries
+    'sphinx.ext.autosectionlabel', # Automatically label each section
 ]
 
 templates_path = ['_templates']

@@ -5,7 +5,8 @@ Install using pip
 -----------------
 
 The ``nygrid`` package can be installed using pip::
-pip install nygrid
+
+       pip install nygrid
 
 Install from source
 -------------------

@@ -6,7 +6,7 @@
 Welcome to NYgrid-python's documentation!
 =========================================
 
-.. image:: https://img.shields.io/badge/License-MIT-yellow.svg
+.. image:: https://img.shields.io/badge/License-MIT-blue.svg
    :target: https://github.com/boyuan276/NYgrid-python/blob/main/LICENSE
 .. image:: https://img.shields.io/badge/python-3.8-blue.svg
 .. image:: https://img.shields.io/badge/python-3.9-blue.svg

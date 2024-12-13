@@ -1,10 +1,40 @@
 # NYgrid-python
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/boyuan276/NYgrid-python/blob/main/LICENSE)
-![Python](https://img.shields.io/badge/python-3.8-blue.svg)
-![Python](https://img.shields.io/badge/python-3.9-blue.svg)
-[![Python package](https://github.com/boyuan276/NYgrid-python/actions/workflows/python-package.yml/badge.svg)](https://github.com/boyuan276/NYgrid-python/actions/workflows/python-package.yml)
-[![CodeQL](https://github.com/boyuan276/NYgrid-python/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/boyuan276/NYgrid-python/actions/workflows/github-code-scanning/codeql)
+<table>
+<tr>
+    <td>Latest Release</td>
+    <td>
+        <a href="https://pypi.org/project/nygrid/">
+        <img src="https://img.shields.io/pypi/v/nygrid" alt="latest release" />
+        </a>
+        <a href="https://github.com/boyuan276/NYgrid-python/actions/workflows/python-publish.yml">
+        <img src="https://github.com/boyuan276/NYgrid-python/actions/workflows/python-publish.yml/badge.svg" alt="latest release" />
+        </a>
+    </td>
+</tr>
+<tr>
+    <td>Build Status</td>
+    <td>
+        <a href="https://nygrid-python.readthedocs.io/en/latest/">
+        <img src="https://readthedocs.org/projects/nygrid-python/badge/?version=latest" alt="documentation build status" />
+        </a>
+        <a href="https://github.com/boyuan276/NYgrid-python/actions/workflows/python-package.yml">
+        <img src="https://github.com/boyuan276/NYgrid-python/actions/workflows/python-package.yml/badge.svg" alt="python-package" />
+        </a>
+        <a href="https://github.com/boyuan276/NYgrid-python/actions/workflows/github-code-scanning/codeql">
+        <img src="https://github.com/boyuan276/NYgrid-python/actions/workflows/github-code-scanning/codeql/badge.svg" alt="codeql" />
+        </a>
+    </td>
+</tr>
+<tr>
+    <td>License</td>
+    <td>
+        <a href="https://github.com/boyuan276/NYgrid-python/blob/main/LICENSE">
+        <img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="license" />
+        </a>
+    </td>
+</tr>
+</table>
 
 A python version of the NYgrid model.
 

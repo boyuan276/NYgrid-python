@@ -15,8 +15,8 @@
 <tr>
     <td>Build Status</td>
     <td>
-        <a href="https://nygrid-python.readthedocs.io/en/latest/">
-        <img src="https://readthedocs.org/projects/nygrid-python/badge/?version=latest" alt="documentation build status" />
+        <a href="https://nygrid-python.readthedocs.io/en/stable/">
+        <img src="https://readthedocs.org/projects/nygrid-python/badge/?version=stable" alt="documentation build status" />
         </a>
         <a href="https://github.com/boyuan276/NYgrid-python/actions/workflows/python-package.yml">
         <img src="https://github.com/boyuan276/NYgrid-python/actions/workflows/python-package.yml/badge.svg" alt="python-package" />

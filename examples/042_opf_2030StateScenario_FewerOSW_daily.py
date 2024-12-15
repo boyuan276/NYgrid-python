@@ -147,8 +147,8 @@ if __name__ == '__main__':
     hour_since_last_shutdown = None
 
     # Restart from the middle
-    last_cycle_idx = 0
-    # last_cycle_idx = 26
+    # last_cycle_idx = 0
+    last_cycle_idx = 12
 
     # Loop through all days
     for d in tqdm(range(last_cycle_idx, len(timestamp_list)), desc='Running OPF'):

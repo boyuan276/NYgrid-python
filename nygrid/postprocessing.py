@@ -222,8 +222,8 @@ def get_flow_results(results: dict,
     branch_flow.columns = branch_names
 
     # Interface flow
-    if_names = (nygrid_sim.grid_prop['if_lim_prop']['TO_ZONE'] + '-'
-                + nygrid_sim.grid_prop['if_lim_prop']['FROM_ZONE'])
+    if_names = (nygrid_sim.grid_prop['if_lim_prop']['FROM_ZONE'] + '-'
+                + nygrid_sim.grid_prop['if_lim_prop']['TO_ZONE'])
 
     if_flow = results['IF'].iloc[:valid_hours, :]
     if_flow.columns = if_names

@@ -1,6 +1,6 @@
 """
 Run multi-period OPF with 2018 data.
-Case name: 2030ContractCase
+Case name: 2030StateScenario_FewerOSW
 
 Authors:
 - Bo Yuan (Cornell University)

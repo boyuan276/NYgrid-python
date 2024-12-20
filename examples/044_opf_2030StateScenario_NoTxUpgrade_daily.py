@@ -1,6 +1,6 @@
 """
-Run multi-period OPF with 2018 data.
-Case name: 2030ContractCase
+Run multi-period OPF with 2030 data.
+Case name: 2030StateScenario_NoTxUpgrade
 
 Authors:
 - Bo Yuan (Cornell University)

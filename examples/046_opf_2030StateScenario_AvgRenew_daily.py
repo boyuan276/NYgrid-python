@@ -24,7 +24,7 @@ if __name__ == '__main__':
     # NOTE: Change the following settings to run the simulation
     ext_cost_factor = 0.0
     fo_cost_factor = 0.5
-    sim_name = f'2030StateScenario_NoLargeLoad_ext{ext_cost_factor}_fo{fo_cost_factor}_daily'
+    sim_name = f'2030StateScenario_AvgRenew_ext{ext_cost_factor}_fo{fo_cost_factor}_daily'
 
     # Simulation time settings
     valid_days = 14
@@ -55,7 +55,7 @@ if __name__ == '__main__':
     cwd = os.getcwd()
     data_dir = os.path.join(cwd, 'data')
 
-    grid_data_dir = os.path.join(data_dir, 'grid', '2030StateScenario_NoLargeLoad')
+    grid_data_dir = os.path.join(data_dir, 'grid', '2030StateScenario_AvgRenew')
     if not os.path.exists(grid_data_dir):
         raise FileNotFoundError('Grid data directory not found.')
 
@@ -147,8 +147,8 @@ if __name__ == '__main__':
     hour_since_last_shutdown = None
 
     # Restart from the middle
-    # last_cycle_idx = 0
-    last_cycle_idx = 26
+    last_cycle_idx = 0
+    # last_cycle_idx = 26
 
     # Loop through all days
     for d in tqdm(range(last_cycle_idx, len(timestamp_list)), desc='Running OPF'):

@@ -24,6 +24,7 @@ It contains the following components:
 - Building electrification
 - Battery storage
 - Electric vehicle (EV) charging
+- Hydrogen integration
 
 .. toctree::
    :maxdepth: 1
@@ -34,6 +35,7 @@ It contains the following components:
    usage
    nygrid
    optimizer
+   hydrogen
 
 .. toctree::
    :hidden:
